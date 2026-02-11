@@ -14,5 +14,5 @@ export interface AuthContextType {
   isAuthorized: boolean;
 }
 
-// UID del usuario autorizado (reemplaza con el UID real)
-export const AUTHORIZED_UID = process.env.REACT_APP_AUTHORIZED_UID || 'default-uid';
+// UID del usuario autorizado (reemplaza con Vite env variable VITE_AUTHORIZED_UID)
+export const AUTHORIZED_UID = import.meta.env.VITE_AUTHORIZED_UID ?? 'default-uid';

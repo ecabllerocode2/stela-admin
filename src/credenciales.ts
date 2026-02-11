@@ -5,15 +5,15 @@ import { getMessaging, getToken } from "firebase/messaging";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 
-// Configuración de Firebase
+// Configuración de Firebase (usa Vite env variables en producción)
 const firebaseConfig = {
-  apiKey: "AIzaSyDYJbwJgqTFBdToJIkhMRbwbI0x88QiCwI",
-  authDomain: "stela-a8c06.firebaseapp.com",
-  projectId: "stela-a8c06",
-  storageBucket: "stela-a8c06.firebasestorage.app",
-  messagingSenderId: "844317368141",
-  appId: "1:844317368141:web:d4f862c7a7ee32859f6104",
-  measurementId: "G-GEM1LZE0TF"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? "AIzaSyDYJbwJgqTFBdToJIkhMRbwbI0x88QiCwI",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "stela-a8c06.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "stela-a8c06",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? "stela-a8c06.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "844317368141",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? "1:844317368141:web:d4f862c7a7ee32859f6104",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? "G-GEM1LZE0TF"
 };
 
 // Inicializa Firebase

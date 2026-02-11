@@ -1,4 +1,4 @@
-const CACHE_NAME = 'intranet-malim-v2';
+const CACHE_NAME = 'stela-admin-v2';
 const CORE_ASSETS = [
   '/',
   '/index.html',
