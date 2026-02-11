@@ -53,7 +53,7 @@ if (!serviceAccount && fs.existsSync(rootServiceAccountPath)) {
 if (!serviceAccount) {
   console.error('\n❌ Error: No se encontraron credenciales de Firebase Admin\n');
   console.log('📝 Para obtener las credenciales:');
-  console.log('   1. Ve a: https://console.firebase.google.com/project/malim-app/settings/serviceaccounts/adminsdk');
+  console.log('   1. Ve a: https://console.firebase.google.com/project/stela-a8c06/settings/serviceaccounts/adminsdk');
   console.log('   2. Click en "Generar nueva clave privada"');
   console.log('   3. Guarda el archivo JSON como: scripts/service-account-key.json\n');
   console.log('📖 Ver instrucciones completas: scripts/INSTRUCCIONES-EJECUTAR.md\n');
@@ -62,7 +62,7 @@ if (!serviceAccount) {
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  projectId: "malim-app"
+  projectId: "stela-a8c06"
 });
 
 const db = admin.firestore();

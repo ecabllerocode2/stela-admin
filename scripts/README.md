@@ -19,7 +19,7 @@ npm install firebase-admin
 ### 2. Obtener Credenciales de Firebase Admin
 
 1. Ve a [Firebase Console](https://console.firebase.google.com/)
-2. Selecciona tu proyecto: `malim-app`
+2. Selecciona tu proyecto: `stela-a8c06`
 3. Ve a **Configuración del proyecto** (⚙️)
 4. Pestaña **Cuentas de servicio**
 5. Click en **Generar nueva clave privada**

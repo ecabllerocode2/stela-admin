@@ -3,16 +3,17 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, where, Timestamp, getDocs } from "firebase/firestore";
 import { getMessaging, getToken } from "firebase/messaging";
 import { getAnalytics } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
 
 // Configuración de Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyAcPmOLCEeL5sRenwhtTWCIBawWNcnD4Ls",
-  authDomain: "malim-app.firebaseapp.com",
-  projectId: "malim-app",
-  storageBucket: "malim-app.firebasestorage.app",
-  messagingSenderId: "953747301080",
-  appId: "1:953747301080:web:d3cfd18e9be012bb822dad",
-  measurementId: "G-9DD5YEX28R"
+  apiKey: "AIzaSyDYJbwJgqTFBdToJIkhMRbwbI0x88QiCwI",
+  authDomain: "stela-a8c06.firebaseapp.com",
+  projectId: "stela-a8c06",
+  storageBucket: "stela-a8c06.firebasestorage.app",
+  messagingSenderId: "844317368141",
+  appId: "1:844317368141:web:d4f862c7a7ee32859f6104",
+  measurementId: "G-GEM1LZE0TF"
 };
 
 // Inicializa Firebase
@@ -24,11 +25,14 @@ const db = getFirestore(app);
 // Messaging
 const messaging = getMessaging(app);
 
-// Analytics (solo si window existe)
+// Analytics (solo si window exista)
 const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
 
+// Auth
+const auth = getAuth(app);
+
 // Exporta instancias
-export { db, messaging, analytics };
+export { db, messaging, analytics, auth };
 
 export const generateToken = async () => {
   const permission = await Notification.requestPermission();

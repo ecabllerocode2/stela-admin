@@ -1,23 +1,8 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
+import { auth as firebaseAuth } from '../credenciales';
 
-// Configuración de Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAcPmOLCEeL5sRenwhtTWCIBawWNcnD4Ls",
-  authDomain: "malim-app.firebaseapp.com",
-  projectId: "malim-app",
-  storageBucket: "malim-app.firebasestorage.app",
-  messagingSenderId: "953747301080",
-  appId: "1:953747301080:web:d3cfd18e9be012bb822dad",
-  measurementId: "G-9DD5YEX28R"
-};
-
-// Inicializa Firebase
-const app = initializeApp(firebaseConfig);
-
-// Obtén instancia de Auth
-export const auth: Auth = getAuth(app);
+// Exportar la instancia de Auth centralizada
+export const auth: Auth = firebaseAuth;
 
 // Tipo para el contexto de autenticación
 export interface AuthContextType {

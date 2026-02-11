@@ -6,7 +6,7 @@ El script necesita autenticación de Firebase Admin. Tienes 2 opciones:
 
 ### Opción A: Descargar Clave de Servicio (Recomendado - 2 minutos)
 
-1. Ve a: https://console.firebase.google.com/project/malim-app/settings/serviceaccounts/adminsdk
+1. Ve a: https://console.firebase.google.com/project/stela-a8c06/settings/serviceaccounts/adminsdk
 2. Click en **"Generar nueva clave privada"**
 3. Se descargará un archivo JSON
 4. **Guárdalo** como: `/workspaces/intranet-malim/scripts/service-account-key.json`

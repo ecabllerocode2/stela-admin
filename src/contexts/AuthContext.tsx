@@ -4,27 +4,9 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  getAuth 
 } from 'firebase/auth';
-import { initializeApp } from 'firebase/app';
-
-// Configuración de Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyAcPmOLCEeL5sRenwhtTWCIBawWNcnD4Ls",
-  authDomain: "malim-app.firebaseapp.com",
-  projectId: "malim-app",
-  storageBucket: "malim-app.firebasestorage.app",
-  messagingSenderId: "953747301080",
-  appId: "1:953747301080:web:d3cfd18e9be012bb822dad",
-  measurementId: "G-9DD5YEX28R"
-};
-
-// Inicializar Firebase (si no está ya inicializado)
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-// UID autorizado para acceder a la intranet
-const AUTHORIZED_UID = 'caU0aiwW3Td3waKBEAUj6Fz4ggy2';
+import { auth } from '../credenciales';
+import { AUTHORIZED_UID } from './authConfig';
 
 interface AuthContextType {
   user: User | null;
