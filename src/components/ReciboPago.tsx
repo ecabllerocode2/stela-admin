@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import logoUrl from '../assets/malim-logo-negro.png';
+
 import { DocumentArrowDownIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { doc as firestoreDoc, getDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
@@ -89,14 +89,14 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
     pdf.setFillColor(colorNudeHeader.r, colorNudeHeader.g, colorNudeHeader.b);
     pdf.rect(0, 0, pdfWidth, headerHeight, 'F');
 
-    // Logo
+    // Logo (texto)
     try {
-      const logoData = await getImageDataUrl(logoUrl);
-      const logoSize = 45;
-      // Centrar logo verticalmente en la parte superior del header
-      pdf.addImage(logoData, 'PNG', centerX - (logoSize / 2), 30, logoSize, logoSize);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.setTextColor(colorTextoPrincipal.r, colorTextoPrincipal.g, colorTextoPrincipal.b);
+      pdf.text('STELA', centerX, 60, { align: 'center' });
     } catch (e) {
-      console.error("No se pudo cargar el logo", e);
+      console.error("No se pudo renderizar el texto del logo", e);
     }
 
     // Texto: ¡Gracias por tu pago!
@@ -206,12 +206,8 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) throw new Error('No se pudo crear documento en iframe');
 
-      // Intentar convertir el logo a data URL
-      let logoSrc = logoUrl;
-      try {
-        const logoData = await toDataURL(logoUrl as string);
-        if (logoData) logoSrc = logoData;
-      } catch (e) {}
+      // Usar texto en lugar de imagen para el logo en la versión HTML del recibo
+      const logoSrc = null;
 
       // Colores Nude / Elegantes (iguales al PDF)
       const colorNudeHeader = 'rgb(244, 232, 228)'; // Nude rosado suave
@@ -359,7 +355,7 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
         <div class="container">
           <!-- Encabezado con fondo nude -->
           <div class="header">
-            <img src="${logoSrc}" alt="Logo" class="logo" crossorigin="anonymous" />
+            <div class="logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:rgb(60,60,60);">STELA</div>
             <div class="gracias">¡Gracias por tu pago!</div>
           </div>
           
@@ -633,7 +629,7 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
             <h3 className="text-lg font-bold text-gray-800">Recibo de Pago</h3>
             <p className="text-xs text-gray-500 font-mono mt-1">Ref: {pago.folioTransaccion}</p>
           </div>
-          <img src={logoUrl} alt="Malim" className="h-8 opacity-90" />
+          <div className="text-sm font-semibold text-gray-700">STELA</div>
         </div>
 
         {/* Content Modal */}

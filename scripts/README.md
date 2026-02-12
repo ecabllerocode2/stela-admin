@@ -1,4 +1,4 @@
-# 📜 Scripts de Utilidad - Malim Intranet
+# 📜 Scripts de Utilidad - STELA Intranet
 
 ## 📦 Contenido
 

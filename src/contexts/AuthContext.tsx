@@ -1,7 +1,10 @@
 import React, { createContext, useEffect, useState } from 'react';
 import { 
   type User, 
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut, 
   onAuthStateChanged,
 } from 'firebase/auth';
@@ -12,6 +15,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAuthorized: boolean;
@@ -37,13 +42,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Validar que el usuario esté autorizado
-      if (userCredential.user.uid !== AUTHORIZED_UID) {
+      // En desarrollo, permitir acceso a todos los usuarios
+      // En producción, validar AUTHORIZED_UID
+      const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
+      
+      if (!isDevelopment && userCredential.user.uid !== AUTHORIZED_UID) {
         await signOut(auth);
         throw new Error('No tienes permisos para acceder a esta aplicación');
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
+      throw error;
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      // En desarrollo, todos los usuarios registrados tienen acceso completo
+    } catch (error) {
+      console.error('Error al registrar usuario:', error);
+      throw error;
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      
+      // En desarrollo, permitir acceso a todos los usuarios
+      // En producción, validar AUTHORIZED_UID
+      const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
+      
+      if (!isDevelopment && userCredential.user.uid !== AUTHORIZED_UID) {
+        await signOut(auth);
+        throw new Error('No tienes permisos para acceder a esta aplicación');
+      }
+    } catch (error) {
+      console.error('Error al iniciar sesión con Google:', error);
       throw error;
     }
   };
@@ -57,13 +94,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // En desarrollo, todos los usuarios autenticados están autorizados
+  const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
+
   const value = {
     user,
     loading,
     login,
+    register,
+    loginWithGoogle,
     logout,
     isAuthenticated: !!user,
-    isAuthorized: !!user && user.uid === AUTHORIZED_UID,
+    isAuthorized: !!user && (isDevelopment || user.uid === AUTHORIZED_UID),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,7 +1,7 @@
 {
-  "name": "intranet malim",
-  "short_name": "intranet malim",
-  "description": "Intranet Malim - Aplicación web progresiva",
+  "name": "intranet stela",
+  "short_name": "intranet stela",
+  "description": "Intranet Stela - Aplicación web progresiva",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

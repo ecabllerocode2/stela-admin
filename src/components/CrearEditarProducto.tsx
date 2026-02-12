@@ -95,7 +95,7 @@ interface UploadProgress {
 
 // --- CONSTANTES ---
 // Usamos tu backend SOLO para subir imágenes, pero Firestore para guardar los datos
-const BACKEND_URL = (import.meta.env.VITE_API_URL || "https://malim-backend.vercel.app").trim();
+const BACKEND_URL = (import.meta.env.VITE_API_URL || "https://stela-backend.vercel.app").trim();
 const UPLOAD_ENDPOINT = `${BACKEND_URL}/api/upload`;
 
 const CATEGORY_SELECT_OPTIONS: readonly OptionType[] = CATEGORY_OPTIONS_FLAT;

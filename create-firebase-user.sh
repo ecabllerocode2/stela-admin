@@ -51,4 +51,4 @@ echo "- NO compartas la contraseña con nadie"
 echo "- Si olvidas la contraseña, podrás restablecerla desde Firebase Console"
 echo ""
 echo "Después de crear el usuario, será posible iniciar sesión en:"
-echo "https://intranet-malim.vercel.app"
+echo "https://stela-admin.vercel.app/"}},{

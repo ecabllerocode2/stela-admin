@@ -40,3 +40,12 @@ service-account-key.json
 # Logs de scripts
 logs/
 *.log
+
+# Env files (local / production) - do NOT commit
+.env
+.env.*
+.env.local
+.env.production
+.env.*.local
+.vercel
+.env*.local

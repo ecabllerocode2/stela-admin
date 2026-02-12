@@ -1,7 +1,7 @@
 {
-  "name": "malim-scripts",
+  "name": "stela-scripts",
   "version": "1.0.0",
-  "description": "Scripts de utilidad para Malim Intranet",
+  "description": "Scripts de utilidad para STELA Intranet",
   "main": "generar-perfiles-clientes.js",
   "scripts": {
     "generar-perfiles": "node generar-perfiles-clientes.js",
@@ -13,7 +13,7 @@
     "analytics",
     "customer-profiles"
   ],
-  "author": "Malim Team",
+  "author": "STELA Team",
   "license": "UNLICENSED",
   "dependencies": {
     "firebase-admin": "^12.0.0"

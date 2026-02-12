@@ -20,7 +20,7 @@ import SafeImage from './SafeImage';
 import { CATEGORIAS_PRODUCTOS } from '../categorias';
 
 // --- URL del Backend ---
-const BACKEND_URL = (import.meta.env.VITE_API_URL || "https://malim-backend.vercel.app").trim();
+const BACKEND_URL = (import.meta.env.VITE_API_URL || "https://stela-backend.vercel.app").trim();
 
 // --- Tipos de Datos ---
 interface OptionType {

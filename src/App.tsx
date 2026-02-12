@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import logo from "../src/assets/malim-logo-negro.png"
+
 import {
   HomeIcon,
   CubeIcon,
@@ -83,9 +83,11 @@ function Layout({ children }: { children: React.ReactNode }) {
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 text-gray-500">
             <Bars3Icon className="h-6 w-6" />
           </button>
-          {/* Logo Malim Mini [cite: 21] */}
+          {/* Logo STELA Mini */}
           <div className="flex items-center gap-2">
-            <img src={logo} alt="logo de malim" className="h-12 w-12 rounded-lg flex items-center justify-center text-white font-bold" />
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-white text-gray-900 font-bold text-lg shadow">
+              STELA
+            </div>
           </div>
           {/* Indicador de rol [cite: 22] */}
           <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
