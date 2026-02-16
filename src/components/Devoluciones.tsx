@@ -4,6 +4,8 @@ import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { ArrowUturnLeftIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import type { ItemDevuelto, Orden } from '../types/orden';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 
 interface OrdenEntregada extends Orden {
   estadoPedido: 'entregado';
@@ -13,6 +15,8 @@ interface OrdenEntregada extends Orden {
 }
 
 const Devoluciones: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [ordenes, setOrdenes] = useState<OrdenEntregada[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,14 +32,13 @@ const Devoluciones: React.FC = () => {
 
   // Cargar órdenes entregadas
   useEffect(() => {
+    if (!uid) return;
     const fetchOrdenes = async () => {
       try {
-        const q = query(
-          collection(db, 'ordenes'),
-          where('estadoPedido', '==', 'entregado')
-        );
+        const q = userQuery('ordenes', uid);
         const snap = await getDocs(q);
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrdenEntregada));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrdenEntregada))
+          .filter(o => o.estadoPedido === 'entregado');
         setOrdenes(data);
       } catch (error) {
         console.error('Error cargando órdenes entregadas:', error);
@@ -45,7 +48,7 @@ const Devoluciones: React.FC = () => {
       }
     };
     fetchOrdenes();
-  }, []);
+  }, [uid]);
 
   const filteredOrdenes = useMemo(() => {
     return ordenes.filter(o => {
@@ -129,7 +132,7 @@ const Devoluciones: React.FC = () => {
                          metodoReembolso === 'ambos' ? totalDevuelto - reembolsoMonto : 0;
 
       // Obtener clientes crédito actuales FUERA de la transacción
-      const creditosSnap = await getDocs(collection(db, 'clientes_credito'));
+      const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
       const creditosMap = new Map();
       creditosSnap.docs.forEach(doc => {
         const data = doc.data();
@@ -146,7 +149,7 @@ const Devoluciones: React.FC = () => {
       });
 
       // Índice de productos para búsquedas de respaldo
-      const productosSnap = await getDocs(collection(db, 'productos'));
+      const productosSnap = await getDocs(userQuery('productos', uid!));
       const productosIndex = productosSnap.docs.map(d => ({ id: d.id, data: d.data() }));
 
       // Resolver productId antes de la transacción para no leer más dentro
@@ -206,7 +209,7 @@ const Devoluciones: React.FC = () => {
           ...(notas && { notas })
         };
         
-        transaction.set(devolucionRef, devolucionData);
+        transaction.set(devolucionRef, withUserId(devolucionData, uid!));
 
         // 2. Actualizar stock en productos (sumar cantidad devuelta)
         for (const itemDevuelto of itemsADevolverResolved) {
@@ -258,7 +261,7 @@ const Devoluciones: React.FC = () => {
         // 3. Crear movimiento en inventory_movements (entrada por devolución)
         const movementRef = doc(collection(db, 'inventory_movements'));
         const cantidadTotalMov = itemsADevolverSanitized.reduce((acc, it) => acc + (it.cantidad || 0), 0);
-        transaction.set(movementRef, {
+        transaction.set(movementRef, withUserId({
           tipo: 'entrada',
           motivo: 'devolucion',
           cantidad: cantidadTotalMov,
@@ -268,12 +271,12 @@ const Devoluciones: React.FC = () => {
           ordenId: ordenSeleccionada.id,
           fechaRegistro: fechaHoy,
           timestamp: Timestamp.now()
-        });
+        }, uid!));
 
         // 4. Si hay reembolso en dinero, crear movimiento en finanzas
         if (reembolsoMonto > 0) {
           const finanzasRef = doc(collection(db, 'finanzas'));
-          transaction.set(finanzasRef, {
+          transaction.set(finanzasRef, withUserId({
             tipo: 'egreso',
             categoria: 'reembolso_devolucion',
             monto: reembolsoMonto,
@@ -283,7 +286,7 @@ const Devoluciones: React.FC = () => {
             fecha: fechaHoy,
             comentario: `Reembolso por devolución de ${itemsADevolver.length} ítem(s)`,
             createdAt: Timestamp.now()
-          });
+          }, uid!));
 
           // Actualizar saldo pendiente si hay reembolso
           if (reembolsoMonto > 0) {
@@ -321,7 +324,7 @@ const Devoluciones: React.FC = () => {
             });
           } else {
             const creditRef = doc(collection(db, 'clientes_credito'));
-            transaction.set(creditRef, {
+            transaction.set(creditRef, withUserId({
               cliente: clienteNombre,
               saldoTotal: saldoFavor,
               movimientos: [{
@@ -334,7 +337,7 @@ const Devoluciones: React.FC = () => {
               }],
               fechaCreacion: Timestamp.now(),
               timestamp: Timestamp.now()
-            });
+            }, uid!));
           }
         }
 
@@ -373,12 +376,10 @@ const Devoluciones: React.FC = () => {
       setModalOpen(false);
       setOrdenSeleccionada(null);
       // Recargar órdenes
-      const q = query(
-        collection(db, 'ordenes'),
-        where('estadoPedido', '==', 'entregado')
-      );
+      const q = userQuery('ordenes', uid!);
       const snap = await getDocs(q);
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrdenEntregada));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrdenEntregada))
+        .filter(o => o.estadoPedido === 'entregado');
       setOrdenes(data);
     } catch (error) {
       console.error('Error procesando devolución:', error);

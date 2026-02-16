@@ -13,6 +13,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 import { 
   BanknotesIcon, 
   ClockIcon, 
@@ -48,6 +50,8 @@ interface OrdenCobranza {
 }
 
 const Pagos: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [ordenes, setOrdenes] = useState<OrdenCobranza[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,20 +88,19 @@ const Pagos: React.FC = () => {
 
   // --- 1. Carga de Datos (Cuentas por Cobrar) ---
   const fetchDeudas = async () => {
+    if (!uid) return;
     setLoading(true);
     try {
       // Buscamos ordenes donde saldoPendiente > 0
-      const q = query(
-        collection(db, 'ordenes'),
-        where('saldoPendiente', '>', 0)
-        // Nota: evitar '!=' en Firestore para no requerir índices/ordenación compleja
-      );
+      const q = userQuery('ordenes', uid);
 
       const snap = await getDocs(q);
-      const data: OrdenCobranza[] = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      } as OrdenCobranza));
+      const data: OrdenCobranza[] = snap.docs
+        .filter(d => (d.data().saldoPendiente || 0) > 0)
+        .map(d => ({
+          id: d.id,
+          ...d.data()
+        } as OrdenCobranza));
 
       // Ordenar por antigüedad (Prioridad a lo más viejo)
       // Preferimos fechaEntrega, si no existe, usamos fechaCreacion
@@ -118,7 +121,7 @@ const Pagos: React.FC = () => {
 
   useEffect(() => {
     fetchDeudas();
-  }, []);
+  }, [uid]);
 
   // --- 2. Lógica de Cobranza (Días transcurridos) ---
   const getCobranzaStatus = (orden: OrdenCobranza) => {
@@ -152,34 +155,22 @@ const Pagos: React.FC = () => {
     }
 
     (async () => {
-      let lista: OrdenCobranza[] = [];
-      // Intento 1: cliente.nombre
+      // Cargar todas las ordenes del usuario con saldo pendiente
+      let allOrdenes: OrdenCobranza[] = [];
       try {
-        const q = query(
-          collection(db, 'ordenes'),
-          where('saldoPendiente', '>', 0),
-          where('cliente.nombre', '==', nombreCliente)
-        );
-        const snap = await getDocs(q);
-        lista = snap.docs.map(d => ({ id: d.id, ...d.data() } as OrdenCobranza));
+        const allSnap = await getDocs(userQuery('ordenes', uid!));
+        allOrdenes = allSnap.docs
+          .filter(d => (d.data().saldoPendiente || 0) > 0)
+          .map(d => ({ id: d.id, ...d.data() } as OrdenCobranza));
       } catch (err) {
-        console.warn('No se pudo filtrar por cliente.nombre, intentando por cliente string...', err);
+        console.error('Error cargando órdenes del cliente:', err);
       }
 
-      // Intento 2: cliente como string si no hubo resultados
-      if (!lista.length) {
-        try {
-          const q2 = query(
-            collection(db, 'ordenes'),
-            where('saldoPendiente', '>', 0),
-            where('cliente', '==', nombreCliente)
-          );
-          const snap2 = await getDocs(q2);
-          lista = snap2.docs.map(d => ({ id: d.id, ...d.data() } as OrdenCobranza));
-        } catch (err2) {
-          console.error('Error cargando órdenes del cliente:', err2);
-        }
-      }
+      // Filtrar por nombre de cliente
+      let lista = allOrdenes.filter(o => {
+        const n = typeof o.cliente === 'string' ? o.cliente : o.cliente?.nombre;
+        return n === nombreCliente;
+      });
 
       const listaFinal = lista.length ? lista : [orden];
       setOrdenesClientePendientes(listaFinal);
@@ -187,7 +178,7 @@ const Pagos: React.FC = () => {
 
       // Cargar saldo a favor del cliente (clientes_credito)
       try {
-        const creditosSnap = await getDocs(collection(db, 'clientes_credito'));
+        const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
         const clienteNormalized = nombreCliente.toLowerCase().trim();
         const docCredito = creditosSnap.docs.find(d => (d.data().cliente || '').toLowerCase().trim() === clienteNormalized);
         if (docCredito) {
@@ -263,7 +254,7 @@ const Pagos: React.FC = () => {
       const folioTransaccion = `TX-${ordenDestino.id.slice(0,6)}-${Date.now().toString().slice(-6)}`;
 
       if (montoNum > 0) {
-        await addDoc(finanzaRef, {
+        await addDoc(finanzaRef, withUserId({
           tipo: 'ingreso',
           categoria: 'pago_orden',
           monto: montoNum,
@@ -271,16 +262,16 @@ const Pagos: React.FC = () => {
           fecha: fechaPago,
           cliente: clienteNombre || 'Desconocido',
           ordenId: ordenDestino.id,
-          folio: ordenDestino.folio || folioTransaccion, // evitar null para trazabilidad
+          folio: ordenDestino.folio || folioTransaccion,
           pagoId: `p-${Date.now()}`,
           comentario: `Pago aplicado a orden ${ordenDestino.id}`,
           createdAt: Timestamp.now()
-        });
+        }, uid!));
       }
 
       // Descontar saldo a favor si se aplicó
       if (saldoAplicar > 0) {
-        const creditosSnap = await getDocs(collection(db, 'clientes_credito'));
+        const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
         const clienteNormalized = (clienteNombre || '').toLowerCase().trim();
         const docCredito = creditosSnap.docs.find(d => (d.data().cliente || '').toLowerCase().trim() === clienteNormalized);
         if (docCredito) {

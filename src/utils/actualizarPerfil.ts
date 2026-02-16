@@ -5,6 +5,7 @@
 
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../credenciales';
+import { userQuery } from './multitenancy';
 
 // ============================================
 // CONFIGURACIÓN
@@ -109,7 +110,7 @@ function normalizarNombre(nombre: string | undefined): string {
 // FUNCIÓN PRINCIPAL
 // ============================================
 
-export async function actualizarPerfilCliente(clienteNombre: string): Promise<{
+export async function actualizarPerfilCliente(clienteNombre: string, userId: string): Promise<{
   success: boolean;
   clienteId?: string;
   mensaje: string;
@@ -119,31 +120,26 @@ export async function actualizarPerfilCliente(clienteNombre: string): Promise<{
   
   try {
     // 1. Buscar cliente
-    const clientesSnap = await getDocs(
-      query(collection(db, 'clientes'), where('cliente', '==', clienteNombre))
-    );
+    const clientesAll = await getDocs(userQuery('clientes', userId));
+    const matchingClientes = clientesAll.docs.filter(d => d.data().cliente === clienteNombre);
     
-    if (clientesSnap.empty) {
+    if (matchingClientes.length === 0) {
       console.warn(`⚠️  Cliente no encontrado: ${clienteNombre}`);
       return { success: false, mensaje: `Cliente ${clienteNombre} no encontrado` };
     }
     
-    const clienteDoc = clientesSnap.docs[0];
+    const clienteDoc = matchingClientes[0];
     const clienteId = clienteDoc.id;
     console.log(`   🔑 Cliente ID: ${clienteId}`);
     
     // 2. Obtener SOLO órdenes entregadas
-    const ordenesSnap = await getDocs(
-      query(
-        collection(db, 'ordenes'),
-        where('estadoPedido', '==', 'entregado')
-      )
-    );
+    const ordenesSnap = await getDocs(userQuery('ordenes', userId));
     
     const pedidos: any[] = [];
     
     ordenesSnap.forEach(doc => {
       const data = doc.data() as any;
+      if (data.estadoPedido !== 'entregado') return;
       let nombreOrden = '';
       
       if (typeof data.cliente === 'string') {

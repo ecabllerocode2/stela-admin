@@ -20,6 +20,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../credenciales';
+import { useAuth } from '../contexts/AuthContext';
+import { userQuery } from '../utils/multitenancy';
 
 const currency = (value: number) =>
   value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -126,6 +128,8 @@ const weekKey = (date: Date) => {
 };
 
 const Reportes: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [selectedRange, setSelectedRange] = useState<string>('30d');
   const [baseContable, setBaseContable] = useState<'caja' | 'devengado'>('caja');
   const [vistaActiva, setVistaActiva] = useState<string>('general');
@@ -144,13 +148,14 @@ const Reportes: React.FC = () => {
     const fetchAll = async () => {
       setLoading(true);
       try {
+        if (!uid) return;
         const [ordenesSnap, finanzasSnap, productosSnap, devolucionesSnap, clientesSnap, invSnap] = await Promise.all([
-          getDocs(query(collection(db, 'ordenes'))),
-          getDocs(collection(db, 'finanzas')),
-          getDocs(collection(db, 'productos')),
-          getDocs(collection(db, 'devoluciones')),
-          getDocs(collection(db, 'clientes')),
-          getDocs(query(collection(db, 'inventory_movements'), where('tipo', '==', 'entrada')))
+          getDocs(userQuery('ordenes', uid)),
+          getDocs(userQuery('finanzas', uid)),
+          getDocs(userQuery('productos', uid)),
+          getDocs(userQuery('devoluciones', uid)),
+          getDocs(userQuery('clientes', uid)),
+          getDocs(userQuery('inventory_movements', uid))
         ]);
 
         setOrdenes(ordenesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Orden[]);
@@ -158,7 +163,7 @@ const Reportes: React.FC = () => {
         setProductos(productosSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Producto[]);
         setDevoluciones(devolucionesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as DevolucionDoc[]);
         setClientes(clientesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ClienteDoc[]);
-        setInventoryMovements(invSnap.docs.map(d => ({ id: d.id, ...d.data() })) as InventoryMovementDoc[]);
+        setInventoryMovements((invSnap.docs.map(d => ({ id: d.id, ...d.data() })) as InventoryMovementDoc[]).filter(m => m.tipo === 'entrada'));
       } catch (e) {
         console.error('Error cargando datos para reportes', e);
       } finally {
@@ -167,7 +172,7 @@ const Reportes: React.FC = () => {
     };
 
     fetchAll();
-  }, []);
+  }, [uid]);
 
   const startDate = useMemo(() => calcStartDate(selectedRange), [selectedRange]);
   const endDate = useMemo(() => {

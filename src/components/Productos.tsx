@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import Select, { type StylesConfig } from 'react-select';
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 import { 
   PlusIcon, 
   PencilSquareIcon, 
@@ -121,6 +123,8 @@ const getFlatCategoryOptions = (): OptionType[] => {
 // --- Componente Principal ---
 
 const Productos = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,9 +171,10 @@ const Productos = () => {
 
   // 2. Cargar Proveedores de Firestore
   const fetchSuppliers = useCallback(async () => {
+    if (!uid) return;
     setIsLoadingSuppliers(true);
     try {
-      const suppliersCol = collection(db, 'proveedores');
+      const suppliersCol = userQuery('proveedores', uid);
       const supplierSnapshot = await getDocs(suppliersCol);
       const suppliersList: OptionType[] = [];
       supplierSnapshot.forEach((doc) => {
@@ -187,13 +192,14 @@ const Productos = () => {
     } finally {
       setIsLoadingSuppliers(false);
     }
-  }, []);
+  }, [uid]);
 
   // 3. Cargar datos de Firestore (Mantenida)
   useEffect(() => {
+    if (!uid) return;
     const fetchProducts = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "productos"));
+        const querySnapshot = await getDocs(userQuery('productos', uid));
         
         const productsList = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -224,7 +230,7 @@ const Productos = () => {
     };
 
     fetchProducts();
-  }, []);
+  }, [uid]);
 
   // 4. Cargar Proveedores al montar el componente
   useEffect(() => {
@@ -273,7 +279,7 @@ const Productos = () => {
       }
 
       // 2. Buscar órdenes que contengan este producto
-      const ordenesSnapshot = await getDocs(collection(db, 'ordenes'));
+      const ordenesSnapshot = await getDocs(userQuery('ordenes', uid!));
       
       ordenesSnapshot.forEach((docSnap) => {
         const orden = docSnap.data();

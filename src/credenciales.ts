@@ -34,7 +34,7 @@ const auth = getAuth(app);
 // Exporta instancias
 export { db, messaging, analytics, auth };
 
-export const generateToken = async () => {
+export const generateToken = async (userId?: string) => {
   const permission = await Notification.requestPermission();
   console.log(permission);
   if (permission === "granted") {
@@ -50,7 +50,8 @@ export const generateToken = async () => {
       if (querySnapshot.empty) {
         await addDoc(tokensRef, {
           token,
-          timestamp: Timestamp.now()
+          timestamp: Timestamp.now(),
+          ...(userId ? { userId } : {}),
         });
         console.log("Token guardado");
       } else {

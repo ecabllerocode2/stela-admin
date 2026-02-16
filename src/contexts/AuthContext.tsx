@@ -9,7 +9,6 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth } from '../credenciales';
-import { AUTHORIZED_UID } from './authConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -40,16 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // En desarrollo, permitir acceso a todos los usuarios
-      // En producción, validar AUTHORIZED_UID
-      const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
-      
-      if (!isDevelopment && userCredential.user.uid !== AUTHORIZED_UID) {
-        await signOut(auth);
-        throw new Error('No tienes permisos para acceder a esta aplicación');
-      }
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       throw error;
@@ -69,16 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      
-      // En desarrollo, permitir acceso a todos los usuarios
-      // En producción, validar AUTHORIZED_UID
-      const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
-      
-      if (!isDevelopment && userCredential.user.uid !== AUTHORIZED_UID) {
-        await signOut(auth);
-        throw new Error('No tienes permisos para acceder a esta aplicación');
-      }
+      await signInWithPopup(auth, provider);
     } catch (error) {
       console.error('Error al iniciar sesión con Google:', error);
       throw error;
@@ -94,9 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // En desarrollo, todos los usuarios autenticados están autorizados
-  const isDevelopment = import.meta.env.DEV || import.meta.env.VITE_ENV === 'development';
-
+  // SaaS: todo usuario autenticado está autorizado (cada uno ve solo sus datos)
   const value = {
     user,
     loading,
@@ -105,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loginWithGoogle,
     logout,
     isAuthenticated: !!user,
-    isAuthorized: !!user && (isDevelopment || user.uid === AUTHORIZED_UID),
+    isAuthorized: !!user,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -22,6 +22,8 @@ import {
 import showToast from '../utils/toast';
 import ImageZoomModal from './ImageZoomModal';
 import Select from 'react-select';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 
 // --- Interfaces ---
 interface Size {
@@ -88,6 +90,8 @@ interface InventoryAddItem {
 type OptionType = { value: string; label: string };
 
 const Inventario: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,10 +124,11 @@ const Inventario: React.FC = () => {
   const [loadingClientes, setLoadingClientes] = useState<boolean>(false);
 
   useEffect(() => {
+    if (!uid) return;
     const fetchClientes = async () => {
       setLoadingClientes(true);
       try {
-        const snap = await getDocs(collection(db, 'clientes'));
+        const snap = await getDocs(userQuery('clientes', uid));
         const opts: OptionType[] = snap.docs.map(d => {
           const data: any = d.data();
           const nombreBase: string =
@@ -147,15 +152,16 @@ const Inventario: React.FC = () => {
       }
     };
     fetchClientes();
-  }, []);
+  }, [uid]);
 
   // Cargar productos
   useEffect(() => {
+    if (!uid) return;
     const fetchProducts = async () => {
       try {
-        const prodQuery = query(collection(db, 'productos'), orderBy('dateAdded', 'desc'));
+        const prodQuery = userQuery('productos', uid);
         const prodSnap = await getDocs(prodQuery);
-        const prods = prodSnap.docs.map(doc => {
+        const prods = (prodSnap.docs.map(doc => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -163,7 +169,7 @@ const Inventario: React.FC = () => {
             cost: Number(data.cost) || 0,
             publicPrice: Number(data.publicPrice) || 0,
           };
-        }) as Product[];
+        }) as Product[]).sort((a: any, b: any) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime());
         setProducts(prods);
       } catch (error) {
         console.error("Error cargando productos:", error);
@@ -173,7 +179,7 @@ const Inventario: React.FC = () => {
       }
     };
     fetchProducts();
-  }, []);
+  }, [uid]);
 
   // Convertir productos a items de inventario con stock
   const inventoryItems = useMemo(() => {
@@ -514,6 +520,7 @@ const Inventario: React.FC = () => {
       {isAddModalOpen && (
         <AddInventoryModal
           products={products}
+          uid={uid!}
           onClose={() => setIsAddModalOpen(false)}
           onSuccess={() => {
             setIsAddModalOpen(false);
@@ -642,8 +649,8 @@ const Inventario: React.FC = () => {
 
                     if (movement && mermaDoc) {
                       await Promise.all([
-                        addDoc(collection(db, 'inventory_movements'), movement),
-                        addDoc(collection(db, 'mermas'), mermaDoc)
+                        addDoc(collection(db, 'inventory_movements'), withUserId(movement, uid!)),
+                        addDoc(collection(db, 'mermas'), withUserId(mermaDoc, uid!))
                       ]);
                     }
                     showToast('Merma registrada y stock actualizado', 'success');
@@ -793,8 +800,8 @@ const Inventario: React.FC = () => {
 
                     if (movement && regaloDoc) {
                       await Promise.all([
-                        addDoc(collection(db, 'inventory_movements'), movement),
-                        addDoc(collection(db, 'regalos'), regaloDoc)
+                        addDoc(collection(db, 'inventory_movements'), withUserId(movement, uid!)),
+                        addDoc(collection(db, 'regalos'), withUserId(regaloDoc, uid!))
                       ]);
                     }
 
@@ -830,12 +837,13 @@ const Inventario: React.FC = () => {
 // --- Modal para Añadir a Inventario ---
 interface AddInventoryModalProps {
   products: Product[];
+  uid: string;
   onClose: () => void;
   onSuccess: () => void;
    onImageClick: (url: string) => void;
 }
 
-const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ products, onClose, onSuccess, onImageClick }) => {
+const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ products, uid, onClose, onSuccess, onImageClick }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
@@ -962,7 +970,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({ products, onClose
             timestamp: Timestamp.now()
           };
 
-          await addDoc(collection(db, 'inventory_movements'), movementData);
+          await addDoc(collection(db, 'inventory_movements'), withUserId(movementData, uid));
         }
       });
 

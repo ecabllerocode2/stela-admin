@@ -4,8 +4,12 @@ import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { CreditCardIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type { ClienteCredito } from '../types/orden';
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 
 const SaldoAFavor: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<(ClienteCredito & { id: string })[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,17 +17,15 @@ const SaldoAFavor: React.FC = () => {
 
   // Cargar clientes con saldo a favor
   useEffect(() => {
+    if (!uid) return;
     const fetchClientes = async () => {
       try {
-        const q = query(
-          collection(db, 'clientes_credito'),
-          where('saldoTotal', '>', 0)
-        );
+        const q = userQuery('clientes_credito', uid);
         const snap = await getDocs(q);
         const data = snap.docs.map(d => ({
           id: d.id,
           ...d.data()
-        } as ClienteCredito & { id: string }));
+        } as ClienteCredito & { id: string })).filter(c => (c.saldoTotal || 0) > 0);
         
         // Ordenar por saldo descendente
         data.sort((a, b) => b.saldoTotal - a.saldoTotal);
@@ -36,7 +38,7 @@ const SaldoAFavor: React.FC = () => {
       }
     };
     fetchClientes();
-  }, []);
+  }, [uid]);
 
   const filteredClientes = useMemo(() => {
     return clientes.filter(c =>

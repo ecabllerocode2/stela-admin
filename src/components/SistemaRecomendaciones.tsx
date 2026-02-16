@@ -8,6 +8,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../credenciales';
+import { useAuth } from '../contexts/AuthContext';
+import { userQuery } from '../utils/multitenancy';
 import showToast from '../utils/toast';
 import {
   obtenerProductosParaCliente,
@@ -37,6 +39,8 @@ type Modo = 'por-cliente' | 'por-producto';
 
 const SistemaRecomendaciones: React.FC = () => {
   // Estados principales
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [modo, setModo] = useState<Modo>('por-cliente');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -63,9 +67,10 @@ const SistemaRecomendaciones: React.FC = () => {
     const cargarDatos = async () => {
       try {
         setLoading(true);
+        if (!uid) return;
 
         // Cargar clientes
-        const clientesSnap = await getDocs(collection(db, 'clientes'));
+        const clientesSnap = await getDocs(userQuery('clientes', uid));
         const clientesData: Cliente[] = clientesSnap.docs.map((doc) => {
           const data = doc.data() as any;
           return {
@@ -80,7 +85,7 @@ const SistemaRecomendaciones: React.FC = () => {
         setClientes(clientesData);
 
         // Cargar productos
-        const productosSnap = await getDocs(collection(db, 'productos'));
+        const productosSnap = await getDocs(userQuery('productos', uid));
         const productosData: Producto[] = productosSnap.docs.map((doc) => {
           const data = doc.data() as any;
           return {
@@ -106,7 +111,7 @@ const SistemaRecomendaciones: React.FC = () => {
     };
 
     cargarDatos();
-  }, []);
+  }, [uid]);
 
   // Manejo de selección de cliente
   const handleSeleccionarCliente = (cliente: Cliente) => {

@@ -4,6 +4,8 @@ import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { actualizarPerfilCliente } from '../utils/actualizarPerfil';
 import ResumenOrden from './ResumenOrden';
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 import {
   MagnifyingGlassIcon,
   TruckIcon,
@@ -33,6 +35,8 @@ interface EstadoEntrega {
 }
 
 const Entregas: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -53,12 +57,13 @@ const Entregas: React.FC = () => {
 
   // Cargar órdenes
   useEffect(() => {
+    if (!uid) return;
     const fetchOrdenes = async () => {
       try {
-        const ordenesRef = collection(db, 'ordenes');
-        const q = query(ordenesRef, orderBy('fechaCreacion', 'desc'));
+        const q = userQuery('ordenes', uid);
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Orden[];
+        const data = (snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Orden[])
+          .sort((a, b) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime());
         // Filtrar solo órdenes con entrega (no son "Punto de venta" o si tienen zona)
         const ordenesConEntrega = data.filter(o => o.entrega === 'Envio' || o.lugar);
         setOrdenes(ordenesConEntrega);
@@ -70,7 +75,7 @@ const Entregas: React.FC = () => {
       }
     };
     fetchOrdenes();
-  }, []);
+  }, [uid]);
 
   // La función esEntregaPersonal se importa de utils/zonas.ts
 
@@ -224,7 +229,7 @@ const Entregas: React.FC = () => {
         if (clienteNombre) {
           try {
             console.log(`\n📊 Marcando orden como entregada, actualizando perfil de ${clienteNombre}...`);
-            const resultado = await actualizarPerfilCliente(clienteNombre);
+            const resultado = await actualizarPerfilCliente(clienteNombre, uid!);
             
             if (resultado.success) {
               showToast(resultado.mensaje, 'success');

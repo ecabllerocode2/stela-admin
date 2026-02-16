@@ -8,6 +8,8 @@ import { esEntregaPersonal } from '../utils/zonas';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../credenciales'; // Tu archivo de configuración
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 import { 
   PlusIcon, 
   CalendarIcon, 
@@ -73,6 +75,8 @@ const customStyles: StylesConfig<OptionType, false> = {
 };
 
 const Pedidos: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -129,18 +133,17 @@ const Pedidos: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!uid) return;
     const fetchOrdenes = async () => {
       try {
-        // Consultamos la colección "ordenes"
-        const ordenesRef = collection(db, 'ordenes');
-        // Ordenamos por fecha de creación (si existe)
-        const q = query(ordenesRef, orderBy('fechaCreacion', 'desc'));
+        // Consultamos la colección "ordenes" filtrada por usuario
+        const q = userQuery('ordenes', uid);
         const querySnapshot = await getDocs(q);
 
-        const ordenesData = querySnapshot.docs.map((doc) => ({
+        const ordenesData = (querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        })) as Orden[];
+        })) as Orden[]).sort((a: any, b: any) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime());
 
         setOrdenes(ordenesData);
       } catch (error) {
@@ -151,7 +154,7 @@ const Pedidos: React.FC = () => {
     };
 
     fetchOrdenes();
-  }, []);
+  }, [uid]);
 
   // Sincronizar barra de scroll superior con la tabla (mostrar scrollbar en el header)
   useEffect(() => {

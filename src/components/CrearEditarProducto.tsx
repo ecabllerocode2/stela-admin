@@ -17,8 +17,10 @@ import { TALLAS_PRODUCTOS, type TallaOption } from '../tallas';
 import { COLORES_COMUNES, type ColorOption } from '../colores';
 
 import { db } from "../credenciales";
-// 2. IMPORTAMOS doc, getDoc, setDoc y Timestamp
-import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+// 2. IMPORTAMOS doc, getDoc, setDoc, addDoc y Timestamp
+import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 
 // --- CONFIGURACIÓN Y DATOS ---
 const OFFER_PERCENTAGES = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
@@ -468,6 +470,8 @@ const VariantCard: React.FC<VariantCardProps> = ({
 // --- Componente Principal ---
 const CrearEditarProducto: React.FC = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const uid = user?.uid;
     // 3. CAPTURAMOS EL ID
     const { id } = useParams();
     const isEditMode = Boolean(id);
@@ -546,12 +550,22 @@ const CrearEditarProducto: React.FC = () => {
     const [currentVariantIdForImage, setCurrentVariantIdForImage] = useState<number | null>(null);
 
     const [supplierOptions, setSupplierOptions] = useState<OptionType[]>([]);
+    const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+    const [newSupplierData, setNewSupplierData] = useState({
+        proveedor: '',
+        contacto: '',
+        telefono: '',
+        email: '',
+        notas: ''
+    });
+    const [isSavingSupplier, setIsSavingSupplier] = useState(false);
     const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
 
     const fetchSuppliers = useCallback(async () => {
+        if (!uid) return;
         setIsLoadingSuppliers(true);
         try {
-            const suppliersCol = collection(db, 'proveedores');
+            const suppliersCol = userQuery('proveedores', uid);
             const supplierSnapshot = await getDocs(suppliersCol);
             const suppliersList: OptionType[] = [];
             supplierSnapshot.forEach((doc) => {
@@ -569,7 +583,69 @@ const CrearEditarProducto: React.FC = () => {
         } finally {
             setIsLoadingSuppliers(false);
         }
-    }, []);
+    }, [uid]);
+
+    const handleSupplierChange = (newValue: OptionType | null) => {
+        if (newValue && newValue.value === '__ADD_NEW__') {
+            setIsSupplierModalOpen(true);
+        } else {
+            handleChange('supplier', newValue ? newValue.value : '');
+        }
+    };
+
+    const handleSaveNewSupplier = async () => {
+        if (!newSupplierData.proveedor.trim()) {
+            alert('El nombre del proveedor es requerido');
+            return;
+        }
+
+        setIsSavingSupplier(true);
+        try {
+            const suppliersCol = collection(db, 'proveedores');
+            await addDoc(suppliersCol, withUserId({
+                proveedor: newSupplierData.proveedor.trim(),
+                contacto: newSupplierData.contacto.trim(),
+                telefono: newSupplierData.telefono.trim(),
+                email: newSupplierData.email.trim(),
+                notas: newSupplierData.notas.trim(),
+                fechaCreacion: new Date().toISOString()
+            }, uid!));
+
+            // Actualizar la lista de proveedores
+            await fetchSuppliers();
+
+            // Asignar el nuevo proveedor al producto
+            handleChange('supplier', newSupplierData.proveedor.trim());
+
+            // Limpiar el formulario y cerrar el modal
+            setNewSupplierData({
+                proveedor: '',
+                contacto: '',
+                telefono: '',
+                email: '',
+                notas: ''
+            });
+            setIsSupplierModalOpen(false);
+
+            alert('Proveedor agregado exitosamente');
+        } catch (error) {
+            console.error('Error al guardar proveedor:', error);
+            alert('Error al guardar el proveedor');
+        } finally {
+            setIsSavingSupplier(false);
+        }
+    };
+
+    const handleCloseSupplierModal = () => {
+        setIsSupplierModalOpen(false);
+        setNewSupplierData({
+            proveedor: '',
+            contacto: '',
+            telefono: '',
+            email: '',
+            notas: ''
+        });
+    };
 
     useEffect(() => {
         fetchSuppliers();
@@ -582,6 +658,71 @@ const CrearEditarProducto: React.FC = () => {
             );
         };
     }, [localImagePreviews]);
+
+    // --- CONVERSIÓN A WEBP ---
+    const convertToWebPIfNeeded = useCallback(async (file: File): Promise<File> => {
+        // Si ya es WebP, retornar sin modificar
+        if (file.type === 'image/webp') {
+            return file;
+        }
+
+        // Verificar que sea una imagen válida
+        if (!file.type.startsWith('image/')) {
+            throw new Error(`El archivo ${file.name} no es una imagen válida`);
+        }
+
+        try {
+            // Crear una URL temporal para cargar la imagen
+            const imageUrl = URL.createObjectURL(file);
+            
+            // Cargar la imagen
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error(`Error al cargar ${file.name}`));
+                image.src = imageUrl;
+            });
+
+            // Limpiar la URL temporal
+            URL.revokeObjectURL(imageUrl);
+
+            // Crear canvas y dibujar la imagen
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                throw new Error('No se pudo crear contexto de canvas');
+            }
+
+            ctx.drawImage(img, 0, 0);
+
+            // Convertir a WebP con alta calidad
+            const webpBlob = await new Promise<Blob>((resolve, reject) => {
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Error al convertir a WebP'));
+                    },
+                    'image/webp',
+                    0.92 // Calidad alta
+                );
+            });
+
+            // Crear nuevo File con el blob WebP
+            const originalName = file.name.replace(/\.[^/.]+$/, '');
+            const webpFile = new File([webpBlob], `${originalName}.webp`, {
+                type: 'image/webp',
+                lastModified: Date.now()
+            });
+
+            return webpFile;
+        } catch (error) {
+            console.error(`Error convirtiendo ${file.name} a WebP:`, error);
+            throw error;
+        }
+    }, []);
 
     const openColorPicker = (variantId: number, currentColor: string) => {
         setCurrentVariantIdForColor(variantId);
@@ -643,13 +784,31 @@ const CrearEditarProducto: React.FC = () => {
         });
     }, []);
 
-    const handleImagesAssigned = useCallback((variantId: number, filesOrUrls: any[], imageIds?: string[]) => {
+    const handleImagesAssigned = useCallback(async (variantId: number, filesOrUrls: any[], imageIds?: string[]) => {
         const isFilesArray = filesOrUrls.length > 0 && filesOrUrls[0] instanceof File;
         if (variantId === null) return;
 
         if (isFilesArray) {
-            const newFiles = filesOrUrls as File[];
-            const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
+            const originalFiles = filesOrUrls as File[];
+            
+            // Convertir cada archivo a WebP si es necesario
+            const convertedFiles: File[] = [];
+            for (const file of originalFiles) {
+                try {
+                    const webpFile = await convertToWebPIfNeeded(file);
+                    convertedFiles.push(webpFile);
+                } catch (error) {
+                    console.error(`Error procesando ${file.name}:`, error);
+                    alert(`No se pudo procesar ${file.name}. Se omitirá este archivo.`);
+                }
+            }
+
+            if (convertedFiles.length === 0) {
+                alert('No se pudo procesar ninguna imagen.');
+                return;
+            }
+
+            const newPreviewUrls = convertedFiles.map(file => URL.createObjectURL(file));
 
             setLocalImagePreviews(prev => ({
                 ...prev,
@@ -663,7 +822,7 @@ const CrearEditarProducto: React.FC = () => {
                 ...prev,
                 [variantId]: [
                     ...(prev[variantId] || []),
-                    ...newFiles
+                    ...convertedFiles
                 ]
             }));
         } else {
@@ -680,7 +839,7 @@ const CrearEditarProducto: React.FC = () => {
 
         setIsImageModalOpen(false);
         setCurrentVariantIdForImage(null);
-    }, []);
+    }, [convertToWebPIfNeeded]);
 
     const finalPrice = useMemo(() =>
         calculateFinalPrice(product.publicPrice, product.offerPercentage),
@@ -802,7 +961,7 @@ const CrearEditarProducto: React.FC = () => {
             const preDocSnap = await getDoc(preDocRef);
             if (!preDocSnap.exists()) {
                 // Crear/sembrar el documento con datos actuales del estado
-                await setDoc(preDocRef, buildMinimalProductForAI(), { merge: true });
+                await setDoc(preDocRef, withUserId(buildMinimalProductForAI(), uid!), { merge: true });
             }
 
             const endpoint = import.meta.env.DEV
@@ -857,7 +1016,7 @@ const CrearEditarProducto: React.FC = () => {
         try {
             const formData = new FormData();
             filesBatch.forEach((file, idx) => {
-                const extension = file.name.split('.').pop() || 'jpg';
+                const extension = 'webp'; // Siempre WebP, ya convertido previamente
                 const variantSku = product.variants.find(v => v.id === variantId)?.variantSku || 'UNKNOWN';
                 const safeVariantSku = variantSku.replace(/[^a-zA-Z0-9]/g, '_');
                 const timestamp = Date.now();
@@ -993,11 +1152,11 @@ const CrearEditarProducto: React.FC = () => {
             const productDocRef = doc(db, "productos", productDocId);
             const publicDocRef = doc(db, "productos_public", productDocId);
 
-            await setDoc(productDocRef, finalProduct, { merge: true });
+            await setDoc(productDocRef, withUserId(finalProduct, uid!), { merge: true });
 
             if (finalProduct.publishOnline) {
                 const publicProduct = buildPublicProduct(finalProduct);
-                await setDoc(publicDocRef, publicProduct, { merge: true });
+                await setDoc(publicDocRef, withUserId(publicProduct, uid!), { merge: true });
             } else {
                 await deleteDoc(publicDocRef).catch(() => {});
             }
@@ -1102,6 +1261,126 @@ const CrearEditarProducto: React.FC = () => {
                 onImagesAssigned={handleImagesAssigned}
                 variantSku={currentVariantSkuForImage}
             />
+
+            {/* Modal Nuevo Proveedor */}
+            {isSupplierModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                        <div className="flex justify-between items-center border-b pb-3">
+                            <h3 className="text-lg font-semibold text-gray-800">Añadir Nuevo Proveedor</h3>
+                            <button
+                                onClick={handleCloseSupplierModal}
+                                className="text-gray-400 hover:text-gray-600 transition"
+                                disabled={isSavingSupplier}
+                            >
+                                <XMarkIcon className="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Nombre del Proveedor *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newSupplierData.proveedor}
+                                    onChange={(e) => setNewSupplierData(prev => ({ ...prev, proveedor: e.target.value }))}
+                                    className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                                    placeholder="Ej: Textiles García"
+                                    disabled={isSavingSupplier}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Persona de Contacto
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newSupplierData.contacto}
+                                    onChange={(e) => setNewSupplierData(prev => ({ ...prev, contacto: e.target.value }))}
+                                    className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                                    placeholder="Ej: Juan Pérez"
+                                    disabled={isSavingSupplier}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Teléfono
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={newSupplierData.telefono}
+                                        onChange={(e) => setNewSupplierData(prev => ({ ...prev, telefono: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                                        placeholder="5512345678"
+                                        disabled={isSavingSupplier}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={newSupplierData.email}
+                                        onChange={(e) => setNewSupplierData(prev => ({ ...prev, email: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                                        placeholder="ejemplo@email.com"
+                                        disabled={isSavingSupplier}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Notas
+                                </label>
+                                <textarea
+                                    value={newSupplierData.notas}
+                                    onChange={(e) => setNewSupplierData(prev => ({ ...prev, notas: e.target.value }))}
+                                    rows={3}
+                                    className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                                    placeholder="Información adicional sobre el proveedor..."
+                                    disabled={isSavingSupplier}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 border-t pt-4">
+                            <button
+                                onClick={handleCloseSupplierModal}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                                disabled={isSavingSupplier}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveNewSupplier}
+                                disabled={isSavingSupplier || !newSupplierData.proveedor.trim()}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                            >
+                                {isSavingSupplier ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <PlusIcon className="h-4 w-4" />
+                                        Guardar Proveedor
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">
                     {isEditMode ? 'Editar Producto' : 'Crear Nuevo Producto'}
@@ -1144,11 +1423,18 @@ const CrearEditarProducto: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Proveedor</label>
                                 <Select<OptionType, false>
-                                    options={supplierOptions}
+                                    options={[
+                                        { value: '__ADD_NEW__', label: '+ Añadir nuevo proveedor' },
+                                        ...supplierOptions
+                                    ]}
                                     value={product.supplier ? { value: product.supplier, label: product.supplier } : null}
-                                    onChange={(newValue) => handleChange('supplier', newValue ? newValue.value : '')}
+                                    onChange={handleSupplierChange}
                                     placeholder={isLoadingSuppliers ? "Cargando proveedores..." : "Seleccionar..."}
-                                ></Select>
+                                    isClearable
+                                    isSearchable
+                                    styles={customStyles}
+                                    className="text-base"
+                                />
                             </div>
                         </div>
                         <div>

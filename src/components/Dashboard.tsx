@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../credenciales';
 import { SparklesIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 
 // --- Interfaces ---
 interface Producto {
@@ -131,6 +133,8 @@ const actionColorMap = {
 
 // --- Componente Principal Dashboard ---
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
@@ -140,21 +144,22 @@ const Dashboard: React.FC = () => {
 
   // --- Carga de Datos ---
   useEffect(() => {
+    if (!uid) return;
     const fetchData = async () => {
       try {
         const [productosSnap, ordenesSnap, creditoSnap, movimientosSnap] = await Promise.all([
-          getDocs(collection(db, 'productos')),
-          getDocs(collection(db, 'ordenes')),
-          getDocs(query(collection(db, 'clientes_credito'), where('saldoTotal', '>', 0))),
-          getDocs(query(collection(db, 'inventory_movements'), where('tipo', '==', 'entrada'))),
-          getDocs(collection(db, 'clientes'))
+          getDocs(userQuery('productos', uid)),
+          getDocs(userQuery('ordenes', uid)),
+          getDocs(userQuery('clientes_credito', uid)),
+          getDocs(userQuery('inventory_movements', uid)),
+          getDocs(userQuery('clientes', uid))
         ]);
 
         setProductos(productosSnap.docs.map(d => ({ id: d.id, ...d.data() } as Producto)));
         setOrdenes(ordenesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Orden)));
-        setClientesCredito(creditoSnap.docs.map(d => d.data() as ClienteCredito));
-        setInventoryMovements(movimientosSnap.docs.map(d => d.data() as InventoryMovement));
-        setClientes((await getDocs(collection(db, 'clientes'))).docs.map(d => ({ id: d.id, ...d.data() })));
+        setClientesCredito(creditoSnap.docs.map(d => d.data() as ClienteCredito).filter(c => (c.saldoTotal || 0) > 0));
+        setInventoryMovements(movimientosSnap.docs.map(d => d.data() as InventoryMovement).filter(m => m.tipo === 'entrada'));
+        setClientes((await getDocs(userQuery('clientes', uid))).docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
         console.error('Error cargando datos del dashboard:', error);
       } finally {
@@ -163,7 +168,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [uid]);
 
   // --- Cálculos de KPIs ---
   const kpis = useMemo(() => {

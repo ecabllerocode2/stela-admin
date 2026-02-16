@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import { XMarkIcon, MagnifyingGlassIcon, DocumentTextIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import ReciboPago from './ReciboPago';
 import showToast from '../utils/toast';
+import { useAuth } from '../contexts';
+import { userQuery } from '../utils/multitenancy';
 
 interface MovimientoFinanzas {
   id: string;
@@ -26,6 +28,8 @@ interface HistorialPagosProps {
 }
 
 const HistorialPagos: React.FC<HistorialPagosProps> = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(false);
   const [pagos, setPagos] = useState<MovimientoFinanzas[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,17 +38,17 @@ const HistorialPagos: React.FC<HistorialPagosProps> = ({ isOpen, onClose }) => {
 
   // Cargar pagos desde finanzas
   const fetchPagos = async () => {
+    if (!uid) return;
     setLoading(true);
     try {
-      const q = query(
-        collection(db, 'finanzas'),
-        where('categoria', '==', 'pago_orden')
-      );
+      const q = userQuery('finanzas', uid);
       const snap = await getDocs(q);
-      const data: MovimientoFinanzas[] = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      } as MovimientoFinanzas));
+      const data: MovimientoFinanzas[] = snap.docs
+        .filter(d => d.data().categoria === 'pago_orden')
+        .map(d => ({
+          id: d.id,
+          ...d.data()
+        } as MovimientoFinanzas));
       
       // Ordenar en memoria por fecha (más recientes primero)
       data.sort((a, b) => {
@@ -90,9 +94,9 @@ const HistorialPagos: React.FC<HistorialPagosProps> = ({ isOpen, onClose }) => {
   const handleVerRecibo = async (pago: MovimientoFinanzas) => {
     // Intentar obtener información de la orden para el recibo
     try {
-      const ordenDoc = await getDocs(query(collection(db, 'ordenes'), where('__name__', '==', pago.ordenId)));
-      if (!ordenDoc.empty) {
-        const ordenData = ordenDoc.docs[0].data();
+      const ordenSnap = await getDoc(doc(db, 'ordenes', pago.ordenId));
+      if (ordenSnap.exists()) {
+        const ordenData = ordenSnap.data();
         const saldoRestante = ordenData.saldoPendiente || 0;
         setReciboSeleccionado({
           pago: {

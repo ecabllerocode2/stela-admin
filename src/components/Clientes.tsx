@@ -14,6 +14,8 @@ import {
 import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 
 // --- Interfaces basadas en tus capturas de Firestore ---
 interface PerfilRecomendacion {
@@ -173,11 +175,15 @@ const Clientes: React.FC = () => {
     });
   }, [clientes, searchTerm, estadoFiltro, ultimaCompraFiltro, cumpleMesFiltro]);
 
+  const { user } = useAuth();
+  const uid = user?.uid;
+
   // Carga inicial de clientes desde Firestore
   useEffect(() => {
+    if (!uid) return;
     const fetchClientes = async () => {
       try {
-        const snap = await getDocs(collection(db, 'clientes'));
+        const snap = await getDocs(userQuery('clientes', uid));
         const data: Cliente[] = snap.docs.map((d) => {
           const raw = d.data() as any;
           const perfil = raw.perfil_recomendacion;
@@ -206,7 +212,7 @@ const Clientes: React.FC = () => {
       }
     };
     fetchClientes();
-  }, []);
+  }, [uid]);
 
   // Handler para guardar nuevo cliente
   const handleAddClient = async (newClient: Partial<Cliente>) => {
@@ -219,7 +225,7 @@ const Clientes: React.FC = () => {
         tipo_cliente: 'nuevo',
       } as any;
 
-      const ref = await addDoc(collection(db, 'clientes'), payload);
+      const ref = await addDoc(collection(db, 'clientes'), withUserId(payload, uid!));
       const client: Cliente = {
         id: ref.id,
         cliente: payload.cliente,

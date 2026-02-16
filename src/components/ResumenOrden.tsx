@@ -31,7 +31,6 @@
  */
 
 import React, { useRef, useState } from 'react';
-import logoNegro from '../assets/malim-logo-negro.png';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { DocumentArrowDownIcon, PhotoIcon } from '@heroicons/react/24/outline';
@@ -104,12 +103,8 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
 
       const clienteNombre = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
 
-      // Intentar convertir el logo a data URL para evitar cualquier problema de carga
-      let logoSrc = logoNegro;
-      try {
-        const logoData = await toDataURL(logoNegro as string);
-        if (logoData) logoSrc = logoData;
-      } catch (e) {}
+      // Usar texto en lugar de imagen para el logo en el export (STELA)
+      const logoSrc = null;
 
       // Agrupar items por nombre de prenda
       const itemsAgrupadosMap = new Map<string, any>();

@@ -13,6 +13,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 import {
   CurrencyDollarIcon,
   CheckCircleIcon,
@@ -25,7 +27,6 @@ import {
 } from '@heroicons/react/24/outline';
 import SafeImage from './SafeImage';
 import html2canvas from 'html2canvas';
-import logoNegro from '../assets/malim-logo-negro.png';
 
 // --- Interfaces ---
 interface CompraItem {
@@ -76,25 +77,26 @@ interface GroupedProvider {
 }
 
 const Compras: React.FC = () => {
+  const { user } = useAuth();
+  const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [itemsByProvider, setItemsByProvider] = useState<GroupedProvider[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [exportingProv, setExportingProv] = useState<string | null>(null);
 
   const fetchCompras = async () => {
+    if (!uid) return;
     setLoading(true);
     try {
       // 1. Cargar items de órdenes (flujo existente)
-      const q = query(
-        collection(db, 'ordenes'),
-        where('estadoPedido', '!=', 'entregado')
-      );
+      const q = userQuery('ordenes', uid);
 
       const snapshot = await getDocs(q);
       const tempItems: (CompraItem | InventoryMovementItem)[] = [];
 
       snapshot.docs.forEach((d) => {
         const data = d.data();
+        if (data.estadoPedido === 'entregado') return;
         const items = data.items || [];
 
         items.forEach((item: any, index: number) => {
@@ -114,18 +116,14 @@ const Compras: React.FC = () => {
       });
 
       // 2. Cargar movimientos de inventario NO comprados
-      const qInventory = query(
-        collection(db, 'inventory_movements'),
-        where('tipo', '==', 'entrada'),
-        where('comprado', '==', false)
-      );
+      const qInventory = userQuery('inventory_movements', uid);
 
       const inventorySnapshot = await getDocs(qInventory);
       
       inventorySnapshot.docs.forEach((d) => {
         const data = d.data();
-        // Filtrar cancelados
-        if (data.cancelado === true) return;
+        // Filtrar: solo entradas, no comprados, no cancelados
+        if (data.tipo !== 'entrada' || data.comprado !== false || data.cancelado === true) return;
         
         tempItems.push({
           id: d.id,
@@ -182,7 +180,7 @@ const Compras: React.FC = () => {
 
   useEffect(() => {
     fetchCompras();
-  }, []);
+  }, [uid]);
 
   const grandTotal = useMemo(() => {
     return itemsByProvider.reduce((acc, prov) => acc + prov.totalPagar, 0);
@@ -255,7 +253,7 @@ const Compras: React.FC = () => {
         const fechaHoy = new Date().toISOString().split('T')[0];
         const folioTransaccion = `GC-${item.orderId.slice(0,6)}-${Date.now().toString().slice(-6)}`;
         
-        await addDoc(collection(db, 'finanzas'), {
+        await addDoc(collection(db, 'finanzas'), withUserId({
           tipo: 'gasto',
           categoria: 'compra_proveedor',
           subcategoria: item.origen === 'stock' ? 'reposicion_inventario' : 'pedido_cliente',
@@ -271,7 +269,7 @@ const Compras: React.FC = () => {
           folio: folioTransaccion,
           comentario: `Compra de ${item.nombre} (${item.color} - ${item.talla}) al proveedor ${item.proveedor}`,
           createdAt: Timestamp.now()
-        });
+        }, uid!));
       }
 
       showToast(
@@ -315,7 +313,7 @@ const Compras: React.FC = () => {
       const fechaHoy = new Date().toISOString().split('T')[0];
       const folioTransaccion = `GP-${item.orderId.slice(0,6)}-${Date.now().toString().slice(-6)}`;
       
-      await addDoc(collection(db, 'finanzas'), {
+      await addDoc(collection(db, 'finanzas'), withUserId({
         tipo: 'gasto',
         categoria: 'pago_proveedor',
         subcategoria: item.origen === 'stock' ? 'reposicion_inventario' : 'pedido_cliente',
@@ -331,7 +329,7 @@ const Compras: React.FC = () => {
         folio: folioTransaccion,
         comentario: `Pago anticipado de ${item.nombre} (${item.color} - ${item.talla}) al proveedor ${item.proveedor}`,
         createdAt: Timestamp.now()
-      });
+      }, uid!));
 
       showToast('Pago registrado. Costo restado del total.', 'success');
       await fetchCompras();
@@ -410,7 +408,7 @@ const Compras: React.FC = () => {
         const fechaHoy = new Date().toISOString().split('T')[0];
         const folioTransaccion = `GI-${item.id.slice(0,6)}-${Date.now().toString().slice(-6)}`;
         
-        await addDoc(collection(db, 'finanzas'), {
+        await addDoc(collection(db, 'finanzas'), withUserId({
           tipo: 'gasto',
           categoria: 'compra_inventario',
           subcategoria: 'compra_directa',
@@ -426,7 +424,7 @@ const Compras: React.FC = () => {
           folio: folioTransaccion,
           comentario: `Compra de ${item.cantidad} unidad(es) de ${item.nombre} (${item.color} - ${item.talla}) al proveedor ${item.proveedor}`,
           createdAt: Timestamp.now()
-        });
+        }, uid!));
       }
 
       showToast(
@@ -459,7 +457,7 @@ const Compras: React.FC = () => {
       const fechaHoy = new Date().toISOString().split('T')[0];
       const folioTransaccion = `PI-${item.id.slice(0,6)}-${Date.now().toString().slice(-6)}`;
       
-      await addDoc(collection(db, 'finanzas'), {
+      await addDoc(collection(db, 'finanzas'), withUserId({
         tipo: 'gasto',
         categoria: 'pago_inventario',
         subcategoria: 'pago_anticipado',
@@ -475,7 +473,7 @@ const Compras: React.FC = () => {
         folio: folioTransaccion,
         comentario: `Pago anticipado de ${item.cantidad} unidad(es) de ${item.nombre} (${item.color} - ${item.talla}) al proveedor ${item.proveedor}`,
         createdAt: Timestamp.now()
-      });
+      }, uid!));
 
       showToast('Pago registrado y gasto contabilizado', 'success');
       await fetchCompras();

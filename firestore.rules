@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──────────────────────────────────────────────
+    // Helper: el documento pertenece al usuario autenticado
+    // ──────────────────────────────────────────────
+    function isOwner() {
+      return request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifica que el campo userId del documento nuevo sea el del usuario autenticado
+    function creatingOwn() {
+      return isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ──────────────────────────────────────────────
+    // Colecciones principales — CRUD solo para el propietario
+    // ──────────────────────────────────────────────
+
+    match /productos/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /productos_public/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /ordenes/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /clientes/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /clientes_credito/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /proveedores/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /finanzas/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /inventory_movements/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /devoluciones/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /mermas/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /regalos/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    match /tokens/{docId} {
+      allow read, update, delete: if isOwner();
+      allow create: if creatingOwn();
+    }
+
+    // ──────────────────────────────────────────────
+    // Denegar todo lo demás
+    // ──────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

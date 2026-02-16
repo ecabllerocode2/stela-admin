@@ -13,7 +13,7 @@ import {
   arrayUnion,
   increment,
   getDoc,
-  // addDoc
+  addDoc
 } from 'firebase/firestore';
 import { db } from '../credenciales';
 import {
@@ -26,6 +26,8 @@ import {
 } from '@heroicons/react/24/outline';
 import showToast from '../utils/toast';
 import { ZONAS_ENTREGA_MEXICO } from '../lugares';
+import { useAuth } from '../contexts';
+import { userQuery, withUserId } from '../utils/multitenancy';
 
 // --- Interfaces de Tipos ---
 
@@ -114,12 +116,21 @@ interface ActiveOrder {
 
 const NuevoPedido: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const uid = user?.uid;
   const { id: ordenIdParam } = useParams<{ id?: string }>();
 
   // --- Estados de Datos Globales ---
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [clienteOptions, setClienteOptions] = useState<OptionType[]>([]);
+  const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
+  const [newClienteData, setNewClienteData] = useState({
+    cliente: '',
+    telefono: '',
+    cumpleaños: ''
+  });
+  const [isSavingCliente, setIsSavingCliente] = useState(false);
 
   // --- Estado de Edición ---
   const [editingOrdenId, setEditingOrdenId] = useState<string | null>(null);
@@ -157,25 +168,99 @@ const NuevoPedido: React.FC = () => {
   const [showSaldoModal, setShowSaldoModal] = useState(false);
   const [saldoModalValor, setSaldoModalValor] = useState(0);
 
+  // --- Funciones para manejo de clientes ---
+  const fetchClientes = async () => {
+    if (!uid) return;
+    try {
+      const cliSnap = await getDocs(userQuery('clientes', uid));
+      const clientes = cliSnap.docs
+        .map(doc => doc.data().cliente)
+        .filter(Boolean)
+        .map(c => ({ value: c, label: c }));
+      setClienteOptions(clientes);
+    } catch (error) {
+      console.error("Error cargando clientes:", error);
+    }
+  };
+
+  const handleClienteChange = (newValue: OptionType | null) => {
+    if (newValue && newValue.value === '__ADD_NEW__') {
+      setIsClienteModalOpen(true);
+    } else {
+      setOrderData(prev => ({ ...prev, cliente: newValue }));
+    }
+  };
+
+  const handleSaveNewCliente = async () => {
+    if (!newClienteData.cliente.trim()) {
+      alert('El nombre del cliente es requerido');
+      return;
+    }
+
+    setIsSavingCliente(true);
+    try {
+      const payload = {
+        cliente: newClienteData.cliente.trim(),
+        telefono: newClienteData.telefono.trim(),
+        cumpleaños: newClienteData.cumpleaños,
+        cumpleanos: newClienteData.cumpleaños, // Para compatibilidad
+        tipo_cliente: 'nuevo',
+        fechaRegistro: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'clientes'), withUserId(payload, uid!));
+
+      // Actualizar la lista de clientes
+      await fetchClientes();
+
+      // Asignar el nuevo cliente al pedido
+      setOrderData(prev => ({
+        ...prev,
+        cliente: { value: newClienteData.cliente.trim(), label: newClienteData.cliente.trim() }
+      }));
+
+      // Limpiar el formulario y cerrar el modal
+      setNewClienteData({
+        cliente: '',
+        telefono: '',
+        cumpleaños: ''
+      });
+      setIsClienteModalOpen(false);
+
+      showToast('Cliente agregado exitosamente', 'success');
+    } catch (error) {
+      console.error('Error al guardar cliente:', error);
+      showToast('Error al guardar el cliente', 'error');
+    } finally {
+      setIsSavingCliente(false);
+    }
+  };
+
+  const handleCloseClienteModal = () => {
+    setIsClienteModalOpen(false);
+    setNewClienteData({
+      cliente: '',
+      telefono: '',
+      cumpleaños: ''
+    });
+  };
+
 
   // --- 1. Carga Inicial de Datos ---
   useEffect(() => {
+    if (!uid) return;
     const fetchData = async () => {
       try {
         // Cargar Productos
-        const prodQuery = query(collection(db, 'productos'), orderBy('dateAdded', 'desc'));
+        const prodQuery = userQuery('productos', uid);
         const prodSnap = await getDocs(prodQuery);
-        const prods = prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        const prods = (prodSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[])
+          .sort((a: any, b: any) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime());
         setProducts(prods);
         setLoadingProducts(false);
 
         // Cargar Clientes
-        const cliSnap = await getDocs(collection(db, 'clientes'));
-        const clientes = cliSnap.docs
-          .map(doc => doc.data().cliente)
-          .filter(Boolean)
-          .map(c => ({ value: c, label: c }));
-        setClienteOptions(clientes);
+        await fetchClientes();
 
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -183,7 +268,7 @@ const NuevoPedido: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [uid]);
 
   // --- 1.5 Carga de Orden Existente (si estamos editando) ---
   useEffect(() => {
@@ -252,18 +337,18 @@ const NuevoPedido: React.FC = () => {
 
       try {
         // Buscar ordenes de este cliente que NO estén entregadas
-        const q = query(
-          collection(db, 'ordenes'),
-          where('cliente.nombre', '==', orderData.cliente.value),
-          where('estadoPedido', '!=', 'entregado') // Asumimos que 'entregado' cierra el ciclo
-        );
-        const snap = await getDocs(q);
+        const allOrdenesSnap = await getDocs(userQuery('ordenes', uid!));
+        const matchingOrders = allOrdenesSnap.docs.filter(d => {
+          const data = d.data();
+          const nombre = typeof data.cliente === 'string' ? data.cliente : data.cliente?.nombre;
+          return nombre === orderData.cliente.value && data.estadoPedido !== 'entregado';
+        });
 
-        if (!snap.empty) {
+        if (matchingOrders.length > 0) {
           // Tomamos la primera activa encontrada
-          const docData = snap.docs[0].data();
+          const docData = matchingOrders[0].data();
           setActiveOrder({
-            id: snap.docs[0].id,
+            id: matchingOrders[0].id,
             totalVenta: docData.totalVenta || 0,
             itemCount: docData.items?.length || 0
           });
@@ -271,7 +356,7 @@ const NuevoPedido: React.FC = () => {
 
         // Cargar saldo a favor del cliente
         const clienteNormalized = orderData.cliente.value.toLowerCase().trim();
-        const creditosSnap = await getDocs(collection(db, 'clientes_credito'));
+        const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
         
         // Buscar el cliente en la lista (con búsqueda flexible)
         const clienteCredito = creditosSnap.docs.find(doc => {
@@ -452,7 +537,8 @@ const NuevoPedido: React.FC = () => {
                 categoria: item.categoria,
                 cliente: orderData.cliente?.value || '',
                 fechaRegistro: fechaHoy,
-                timestamp: Timestamp.now()
+                timestamp: Timestamp.now(),
+                userId: uid,
               };
               const movementRef = doc(collection(db, 'inventory_movements'));
               transaction.set(movementRef, movementData);
@@ -485,15 +571,12 @@ const NuevoPedido: React.FC = () => {
 
         // C. REGISTRAR MOVIMIENTO DE SALDO SI SE APLICÓ
         if (saldoAplicado > 0 && orderData.cliente) {
-          const clienteCredQ = query(
-            collection(db, 'clientes_credito'),
-            where('cliente', '==', orderData.cliente.value)
-          );
-          const clienteCredSnap = await getDocs(clienteCredQ);
+          const allCreditSnap = await getDocs(userQuery('clientes_credito', uid!));
+          const clienteCredDocs = allCreditSnap.docs.filter(d => d.data().cliente === orderData.cliente.value);
           
-          if (!clienteCredSnap.empty) {
-            const creditDocRef = clienteCredSnap.docs[0].ref;
-            const creditData = clienteCredSnap.docs[0].data();
+          if (clienteCredDocs.length > 0) {
+            const creditDocRef = clienteCredDocs[0].ref;
+            const creditData = clienteCredDocs[0].data();
             
             // Actualizar saldo y registrar movimiento
             const movimiento: typeof creditData.movimientos[0] = {
@@ -548,6 +631,7 @@ const NuevoPedido: React.FC = () => {
           const nuevaOrdenRef = doc(collection(db, 'ordenes'));
           const nuevaOrdenData = {
             id: nuevaOrdenRef.id,
+            userId: uid,
             cliente: {
               nombre: orderData.cliente?.value,
               uid: ''
@@ -932,12 +1016,17 @@ const NuevoPedido: React.FC = () => {
             <div>
               <label className="text-xs font-medium text-gray-500">Cliente</label>
               <Select
-                options={clienteOptions}
+                options={[
+                  { value: '__ADD_NEW__', label: '+ A\u00f1adir nuevo cliente' },
+                  ...clienteOptions
+                ]}
                 value={orderData.cliente}
-                onChange={(val) => setOrderData(prev => ({ ...prev, cliente: val }))}
+                onChange={handleClienteChange}
                 placeholder="Buscar cliente..."
                 styles={customSelectStyles}
                 className="text-sm"
+                isClearable
+                isSearchable
               />
             </div>
 
@@ -1120,6 +1209,96 @@ const NuevoPedido: React.FC = () => {
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg"
                 >
                   No usar ahora
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Nuevo Cliente */}
+        {isClienteModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="text-lg font-semibold text-gray-800">Añadir Nuevo Cliente</h3>
+                <button
+                  onClick={handleCloseClienteModal}
+                  className="text-gray-400 hover:text-gray-600 transition"
+                  disabled={isSavingCliente}
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre Completo *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClienteData.cliente}
+                    onChange={(e) => setNewClienteData(prev => ({ ...prev, cliente: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                    placeholder="Ej: María Pérez"
+                    disabled={isSavingCliente}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Teléfono
+                    </label>
+                    <input
+                      type="tel"
+                      value={newClienteData.telefono}
+                      onChange={(e) => setNewClienteData(prev => ({ ...prev, telefono: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                      placeholder="10 dígitos"
+                      disabled={isSavingCliente}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cumpleaños
+                    </label>
+                    <input
+                      type="date"
+                      value={newClienteData.cumpleaños}
+                      onChange={(e) => setNewClienteData(prev => ({ ...prev, cumpleaños: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 text-sm"
+                      disabled={isSavingCliente}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t pt-4">
+                <button
+                  onClick={handleCloseClienteModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                  disabled={isSavingCliente}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveNewCliente}
+                  disabled={isSavingCliente || !newClienteData.cliente.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                >
+                  {isSavingCliente ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon className="h-4 w-4" />
+                      Guardar Cliente
+                    </>
+                  )}
                 </button>
               </div>
             </div>
