@@ -84,6 +84,26 @@ service cloud.firestore {
     }
 
     // ──────────────────────────────────────────────
+    // Perfil de usuario — cada usuario solo su propio doc
+    // ──────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // ──────────────────────────────────────────────
+    // Suscripciones — cada usuario solo su propio doc
+    // ──────────────────────────────────────────────
+    match /subscriptions/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // ──────────────────────────────────────────────
     // Denegar todo lo demás
     // ──────────────────────────────────────────────
     match /{document=**} {

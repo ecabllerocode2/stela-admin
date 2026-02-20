@@ -1,4 +1,4 @@
-# 📜 Scripts de Utilidad - STELA Intranet
+# 📜 Scripts de Utilidad - Stela Intranet
 
 ## 📦 Contenido
 

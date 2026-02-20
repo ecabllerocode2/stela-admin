@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   getDocs,
-  query,
-  where,
   doc,
   getDoc,
   updateDoc,
@@ -27,6 +25,9 @@ import {
 } from '@heroicons/react/24/outline';
 import SafeImage from './SafeImage';
 import html2canvas from 'html2canvas';
+
+// Logo de la empresa
+const logoNegro = '/icons/stela-logo.png';
 
 // --- Interfaces ---
 interface CompraItem {
@@ -802,7 +803,7 @@ const Compras: React.FC = () => {
                         className={`relative border rounded-lg p-3 transition-all hover:shadow-md flex gap-3 
                           ${(isInventoryItem ? invItem?.pagadoProveedor : ordenItem?.pagadoProveedor) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}
                       >
-                        <div className="w-20 h-24 flex-shrink-0 bg-gray-200 rounded-md overflow-hidden relative">
+                        <div className="w-20 h-24 shrink-0 bg-gray-200 rounded-md overflow-hidden relative">
                           {item.foto ? (
                             <SafeImage src={item.foto} alt={item.nombre} className="w-full h-full object-cover" />
                           ) : (

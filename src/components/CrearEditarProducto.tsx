@@ -98,7 +98,10 @@ interface UploadProgress {
 // --- CONSTANTES ---
 // Usamos tu backend SOLO para subir imágenes, pero Firestore para guardar los datos
 const BACKEND_URL = (import.meta.env.VITE_API_URL || "https://stela-backend.vercel.app").trim();
-const UPLOAD_ENDPOINT = `${BACKEND_URL}/api/upload`;
+// En desarrollo, usar el proxy de Vite para evitar problemas de CORS
+const UPLOAD_ENDPOINT = import.meta.env.DEV
+    ? '/api/upload'
+    : `${BACKEND_URL}/api/upload`;
 
 const CATEGORY_SELECT_OPTIONS: readonly OptionType[] = CATEGORY_OPTIONS_FLAT;
 const SIZE_SELECT_OPTIONS: readonly OptionType[] = ALL_AVAILABLE_SIZES_FLAT;
@@ -171,13 +174,8 @@ const handleNumberFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.select();
 };
 
-const calculatePublicPrice = (costo: number): number => {
-    const cost = Number(costo) || 0;
-    const costFixed = parseFloat(cost.toFixed(2));
-    if (costFixed <= 150) return Math.ceil(costFixed * 2);
-    if (costFixed <= 250) return Math.ceil(costFixed * 1.9);
-    return Math.ceil(costFixed * 1.8);
-};
+// Nota: Se eliminó la función de cálculo automático del Precio Público.
+// Ahora el usuario debe ingresar `publicPrice` manualmente en el formulario.
 
 const calculateFinalPrice = (publicPrice: number, offerPercentage: number): number => {
     const price = Number(publicPrice) || 0;
@@ -187,11 +185,15 @@ const calculateFinalPrice = (publicPrice: number, offerPercentage: number): numb
     return parseFloat((price - discount).toFixed(2));
 };
 
-const generateProductSku = (name: string, category: string): string => {
+const generateProductSku = (name: string, category: string, uid?: string): string => {
     const nameCode = name.substring(0, 3).toUpperCase().padEnd(3, 'X');
     const categoryCode = category.substring(0, 3).toUpperCase().padEnd(3, 'X');
     const uniqueId = Math.random().toString(36).substring(2, 7).toUpperCase();
-    return `MAL-${categoryCode}-${nameCode}-${uniqueId}`;
+    
+    // Generar identificador corto del usuario (primeros 4 caracteres del UID)
+    const userCode = uid ? uid.substring(0, 4).toUpperCase() : 'XXXX';
+    
+    return `STELA-${userCode}-${categoryCode}-${nameCode}-${uniqueId}`;
 };
 
 const generateVariantSku = (productSku: string, colorName: string, size: string): string => {
@@ -485,7 +487,7 @@ const CrearEditarProducto: React.FC = () => {
     
     const [product, setProduct] = useState<ProductData>(() => ({
         name: '',
-        productSku: generateProductSku('', 'XXX'),
+        productSku: generateProductSku('', 'XXX', uid),
         creationDate: new Date().toLocaleString(),
         cost: 0, publicPrice: 0, offerPercentage: 0, supplier: '', category: '',
         shortDetails: '',
@@ -847,8 +849,8 @@ const CrearEditarProducto: React.FC = () => {
     );
 
     const handleCostChange = (newCost: number) => {
-        const calculatedPrice = calculatePublicPrice(newCost);
-        setProduct(prev => ({ ...prev, cost: newCost, publicPrice: calculatedPrice }));
+        // Mantener sólo el costo; el precio público debe ingresarse manualmente en el formulario.
+        setProduct(prev => ({ ...prev, cost: newCost }));
     };
 
     const handleChange = (field: keyof ProductData, value: any) => {
@@ -864,7 +866,7 @@ const CrearEditarProducto: React.FC = () => {
             if (!isEditMode && (field === 'name' || field === 'category')) {
                 const name = field === 'name' ? value : prev.name;
                 const category = field === 'category' ? value : prev.category;
-                newSku = generateProductSku(name, category);
+                newSku = generateProductSku(name, category, uid);
                 newProduct.productSku = newSku;
 
                 // También regeneramos los SKUs de variantes SOLO si es producto nuevo
@@ -1545,7 +1547,7 @@ const CrearEditarProducto: React.FC = () => {
                             <TagIcon className="h-5 w-5 mr-2 text-gray-500" /> Acciones
                         </h2>
                         <div className="flex items-center justify-between mb-4 pb-4 border-b">
-                            <label htmlFor="toggle-publish" className="text-sm font-medium text-gray-700 flex-grow">
+                            <label htmlFor="toggle-publish" className="text-sm font-medium text-gray-700 grow">
                                 Publicar Producto en Tienda
                             </label>
                             <input

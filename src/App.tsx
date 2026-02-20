@@ -7,7 +7,6 @@ import {
   ShoppingCartIcon,
   CurrencyDollarIcon,
   ChartBarIcon,
-  Cog6ToothIcon,
   Bars3Icon,
   BellIcon,
   MagnifyingGlassIcon,
@@ -16,7 +15,6 @@ import {
   ArchiveBoxIcon,
   PhotoIcon,
   ArrowLeftOnRectangleIcon,
-  ArrowPathIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import Dashboard from './components/Dashboard';
@@ -35,10 +33,14 @@ import SaldoAFavor from './components/SaldoAFavor';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
+import TrialBanner from './components/TrialBanner';
+import SubscriptionWall from './components/SubscriptionWall';
+import Planes from './components/Planes';
+import SubscriptionSuccess from './components/SubscriptionSuccess';
+import SubscriptionCancel from './components/SubscriptionCancel';
 import Reportes from './components/Reportes';
 import SistemaRecomendaciones from './components/SistemaRecomendaciones';
-
-
 
 
 // --- Configuración del Menú Lateral  ---
@@ -48,7 +50,6 @@ const menuItems = [
   { name: 'Clientes', path: '/clientes', icon: UserIcon },
   { name: 'Recomendaciones', path: '/recomendaciones', icon: SparklesIcon },
   { name: 'Entregas', path: '/entregas', icon: TruckIcon },
-  { name: 'Devoluciones', path: '/devoluciones', icon: ArrowPathIcon },
   { name: 'Saldo a Favor', path: '/saldo-a-favor', icon: CurrencyDollarIcon },
   { name: 'Productos', path: '/productos', icon: CubeIcon },
   { name: 'Inventario', path: '/inventario', icon: ArchiveBoxIcon },
@@ -56,7 +57,6 @@ const menuItems = [
   { name: 'Compras', path: '/compras', icon: TruckIcon },
   { name: 'Pagos', path: '/pagos', icon: CurrencyDollarIcon },
   { name: 'Reportes', path: '/reportes', icon: ChartBarIcon },
-  { name: 'Configuración', path: '/configuracion', icon: Cog6ToothIcon },
 ];
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -73,54 +73,50 @@ function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    // Fondo app: gray-50 "Ligero, evita fatiga visual" 
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
 
-      {/* --- 1. Topbar (Siempre visible) [cite: 20] --- */}
-      <header className="bg-white border-b border-gray-200 h-16 fixed w-full top-0 z-20 flex items-center justify-between px-4 lg:px-6">
+      {/* --- Trial Banner (fijo arriba de todo) --- */}
+      <div className="fixed w-full top-0 z-30">
+        <TrialBanner />
+      </div>
+
+      {/* --- 1. Topbar --- */}
+      <header className="bg-white border-b border-gray-200 h-16 fixed w-full top-[var(--banner-h,0px)] z-20 flex items-center justify-between px-4 lg:px-6 trial-offset">
         <div className="flex items-center gap-4">
-          {/* Botón menú móvil */}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2 text-gray-500">
             <Bars3Icon className="h-6 w-6" />
           </button>
-          {/* Logo STELA Mini */}
           <div className="flex items-center gap-2">
-            <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-white text-gray-900 font-bold text-lg shadow">
-              STELA
+            <div className="text-2xl font-quicksand font-bold text-gray-900 tracking-tight">
+              Stela
             </div>
           </div>
-          {/* Indicador de rol [cite: 22] */}
           <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             Operaciones
           </span>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Botón de búsqueda global [cite: 23] */}
           <div className="relative hidden md:block">
             <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 w-64" // [cite: 160]
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 w-64"
             />
           </div>
-          {/* Botón de notificaciones [cite: 24] */}
           <button className="p-2 text-gray-400 hover:text-gray-500 relative">
             <BellIcon className="h-6 w-6" />
             <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
           </button>
-          {/* Usuario y Logout */}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-700">{user?.email}</p>
+              <p className="text-sm font-medium text-gray-700">{user?.displayName || user?.email}</p>
               <p className="text-xs text-gray-500">Administrador</p>
             </div>
-            {/* Avatar */}
             <div className="h-8 w-8 rounded-full bg-blue-600 border border-blue-700 flex items-center justify-center text-white text-sm font-bold">
-              {user?.email?.charAt(0).toUpperCase()}
+              {(user?.displayName || user?.email || '?').charAt(0).toUpperCase()}
             </div>
-            {/* Botón Logout */}
             <button
               onClick={handleLogout}
               className="p-2 text-gray-400 hover:text-red-600 transition-colors"
@@ -132,7 +128,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* --- 2. Sidebar (Fija desktop / Drawer móvil)  --- */}
+      {/* --- 2. Sidebar --- */}
       <aside className={`
         fixed inset-y-0 left-0 z-10 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out pt-20 pb-4 overflow-y-auto
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
@@ -145,12 +141,12 @@ function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.name}
                 to={item.path}
-                onClick={() => setSidebarOpen(false)} // Cerrar en móvil al clickear
+                onClick={() => setSidebarOpen(false)}
                 className={`
                   flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors
                   ${isActive
-                    ? 'bg-blue-50 text-blue-700' // Estado activo
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'} // Estado normal [cite: 166]
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
                 `}
               >
                 <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -161,15 +157,14 @@ function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      {/* --- 3. Zona de contenido [cite: 44] --- */}
+      {/* --- 3. Contenido --- */}
       <main className="lg:pl-64 pt-16 transition-all duration-200">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-          {/* Aquí se renderizarán las pantallas */}
           {children}
         </div>
       </main>
 
-      {/* Overlay para móvil cuando el sidebar está abierto */}
+      {/* Overlay móvil */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-50 z-0 lg:hidden"
@@ -183,10 +178,15 @@ function Layout({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Ruta pública de login */}
+      {/* Rutas públicas */}
       <Route path="/login" element={<Login />} />
-      
-      {/* Rutas protegidas */}
+
+      {/* Rutas de suscripción (accesibles estando autenticado pero sin suscripción activa) */}
+      <Route path="/planes" element={<ProtectedRoute><PlanesPage /></ProtectedRoute>} />
+      <Route path="/subscription/success" element={<ProtectedRoute><SubscriptionSuccess /></ProtectedRoute>} />
+      <Route path="/subscription/cancel" element={<ProtectedRoute><SubscriptionCancel /></ProtectedRoute>} />
+
+      {/* Rutas protegidas (requieren suscripción activa) */}
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
       <Route path="/productos/crear" element={<ProtectedRoute><CrearEditarProducto /></ProtectedRoute>} />
@@ -205,37 +205,70 @@ function AppRoutes() {
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
       <Route path="/recomendaciones" element={<ProtectedRoute><SistemaRecomendaciones /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
-      
-      {/* Ruta 404 */}
+
+      {/* 404 */}
       <Route path="*" element={<ProtectedRoute><div className="text-gray-500">Próximamente...</div></ProtectedRoute>} />
     </Routes>
   );
+}
+
+/** Wrapper para la página de planes (no necesita layout ni verificación de suscripción) */
+function PlanesPage() {
+  return <Planes />;
 }
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <SubscriptionProvider>
+          <AppContent />
+        </SubscriptionProvider>
       </AuthProvider>
     </Router>
   );
 }
 
 function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isActive, isExpired, loading: subLoading } = useSubscription();
   const location = useLocation();
+
+  // Rutas que no necesitan layout
+  const noLayoutRoutes = ['/login', '/planes', '/subscription/success', '/subscription/cancel'];
+  const isNoLayoutRoute = noLayoutRoutes.some((r) => location.pathname.startsWith(r));
 
   // No mostrar layout en login
   if (location.pathname === '/login' || !isAuthenticated) {
     return <AppRoutes />;
   }
 
-  if (loading) {
+  // Loading
+  if (authLoading || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex flex-col items-center gap-6">
+          <img src="/icons/stela-logo.png" alt="Stela" className="h-28 w-28 object-contain" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
       </div>
+    );
+  }
+
+  // Rutas sin layout (planes, success, cancel)
+  if (isNoLayoutRoute) {
+    return <AppRoutes />;
+  }
+
+  // Si la suscripción expiró, mostrar paywall (excepto en /planes)
+  if (isExpired) {
+    return (
+      <Routes>
+        <Route path="/planes" element={<ProtectedRoute><PlanesPage /></ProtectedRoute>} />
+        <Route path="/subscription/success" element={<ProtectedRoute><SubscriptionSuccess /></ProtectedRoute>} />
+        <Route path="/subscription/cancel" element={<ProtectedRoute><SubscriptionCancel /></ProtectedRoute>} />
+        <Route path="*" element={<SubscriptionWall />} />
+      </Routes>
     );
   }
 

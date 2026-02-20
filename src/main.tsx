@@ -9,6 +9,10 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+// Quitar splash inyectado en index.html (si existe) tan pronto React monta
+const _splash = document.getElementById('splash');
+if (_splash) _splash.remove();
+
 // Registrar Service Worker en producción
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

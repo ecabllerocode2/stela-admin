@@ -54,6 +54,8 @@ const customSelectStyles: StylesConfig<OptionType, false> = {
     fontSize: '0.9rem',
   }),
   placeholder: (provided) => ({ ...provided, color: '#9ca3af' }),
+  menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
+  menu: (provided) => ({ ...provided, zIndex: 9999 }),
 };
 
 // --- Interfaces de Producto (Inventario) ---
@@ -1027,6 +1029,8 @@ const NuevoPedido: React.FC = () => {
                 className="text-sm"
                 isClearable
                 isSearchable
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
               />
             </div>
 
@@ -1059,29 +1063,28 @@ const NuevoPedido: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-medium text-gray-500">Tipo Entrega</label>
-                <select
-                  disabled={isReadOnly}
-                  className="w-full text-sm border-gray-300 rounded-lg p-2 bg-white border disabled:opacity-50 disabled:cursor-not-allowed"
-                  value={orderData.entrega}
-                  onChange={(e) => setOrderData(prev => ({ ...prev, entrega: e.target.value }))}
-                >
-                  <option value="Punto de venta">Punto de venta</option>
-                  <option value="Envio">Envío</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-500">Fecha (Opcional)</label>
-                <input
-                  type="date"
-                  disabled={isReadOnly}
-                  className="w-full text-sm border-gray-300 rounded-lg p-2 border disabled:opacity-50 disabled:cursor-not-allowed"
-                  value={orderData.fechaEntrega}
-                  onChange={(e) => setOrderData(prev => ({ ...prev, fechaEntrega: e.target.value }))}
-                />
-              </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500">Tipo de Entrega *</label>
+              <select
+                disabled={isReadOnly}
+                className="w-full text-sm border-gray-300 rounded-lg p-2 bg-white border disabled:opacity-50 disabled:cursor-not-allowed"
+                value={orderData.entrega}
+                onChange={(e) => setOrderData(prev => ({ ...prev, entrega: e.target.value }))}
+              >
+                <option value="Punto de venta">Entrega Personal (Punto de Venta)</option>
+                <option value="Envio">Envío a Domicilio (Paquetería)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-500">Fecha de Entrega (Opcional)</label>
+              <input
+                type="date"
+                disabled={isReadOnly}
+                className="w-full text-sm border-gray-300 rounded-lg p-2 border disabled:opacity-50 disabled:cursor-not-allowed"
+                value={orderData.fechaEntrega}
+                onChange={(e) => setOrderData(prev => ({ ...prev, fechaEntrega: e.target.value }))}
+              />
             </div>
             <div className="mt-2">
               <label className="text-xs font-medium text-gray-500">Descuento (%)</label>
@@ -1139,6 +1142,8 @@ const NuevoPedido: React.FC = () => {
                 styles={customSelectStyles}
                 className="text-sm"
                 isClearable
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
               />
             </div>
           </div>
@@ -1306,7 +1311,7 @@ const NuevoPedido: React.FC = () => {
         )}
 
         {/* FOOTER: BOTÓN FINAL */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        <div className="p-4 border-t border-gray-200 bg-gray-50 shrink-0">
           <button
             onClick={handleSubmitOrden}
             disabled={submitting || cart.length === 0 || isReadOnly}

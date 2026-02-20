@@ -94,11 +94,10 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(18);
       pdf.setTextColor(colorTextoPrincipal.r, colorTextoPrincipal.g, colorTextoPrincipal.b);
-      pdf.text('STELA', centerX, 60, { align: 'center' });
+      pdf.text('Stela', centerX, 60, { align: 'center' });
     } catch (e) {
       console.error("No se pudo renderizar el texto del logo", e);
     }
-
     // Texto: ¡Gracias por tu pago!
     // Usamos 'times' e 'italic' para dar ese toque elegante de boutique
     y = 110;
@@ -355,7 +354,7 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
         <div class="container">
           <!-- Encabezado con fondo nude -->
           <div class="header">
-            <div class="logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:rgb(60,60,60);">STELA</div>
+            <div class="logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:rgb(60,60,60);font-family:Quicksand, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Stela</div>
             <div class="gracias">¡Gracias por tu pago!</div>
           </div>
           
@@ -629,12 +628,7 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
             <h3 className="text-lg font-bold text-gray-800">Recibo de Pago</h3>
             <p className="text-xs text-gray-500 font-mono mt-1">Ref: {pago.folioTransaccion}</p>
           </div>
-          <div className="text-sm font-semibold text-gray-700">STELA</div>
-        </div>
-
-        {/* Content Modal */}
-        <div ref={contentRef} className="p-6 space-y-6">
-          
+          <div className="text-sm font-quicksand font-semibold text-gray-700">Stela</div>
           {/* Main Stats Grid */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-1">

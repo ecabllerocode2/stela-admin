@@ -1,1 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@700&display=swap');
 @import "tailwindcss";
+
+/* Utility: Quicksand Bold for logo text */
+.font-quicksand {
+  font-family: 'Quicksand', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+}

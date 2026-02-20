@@ -7,14 +7,17 @@ import {
   GoogleAuthProvider,
   signOut, 
   onAuthStateChanged,
+  updateProfile,
 } from 'firebase/auth';
-import { auth } from '../credenciales';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../credenciales';
+import type { UserProfile } from './authConfig';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, profile: UserProfile) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -23,12 +26,53 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Crea el perfil del usuario y la suscripción trial en Firestore */
+async function createUserProfile(uid: string, email: string, profile: UserProfile) {
+  // Guardar perfil en colección 'users'
+  await setDoc(doc(db, 'users', uid), {
+    uid,
+    email,
+    nombre: profile.nombre,
+    nombreNegocio: profile.nombreNegocio || '',
+    telefono: profile.telefono,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  // Crear suscripción trial de 15 días (plan Business)
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + 15);
+
+  await setDoc(doc(db, 'subscriptions', uid), {
+    plan: 'business',
+    status: 'trialing',
+    trialEnd,
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: trialEnd,
+    hasHadTrial: true,
+    cancelAtPeriodEnd: false,
+    email,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Verifica si un usuario Google es nuevo y le crea perfil/trial si lo es */
+async function ensureGoogleUserProfile(user: User) {
+  const userDoc = await getDoc(doc(db, 'users', user.uid));
+  if (!userDoc.exists()) {
+    await createUserProfile(user.uid, user.email || '', {
+      nombre: user.displayName || '',
+      telefono: '',
+    });
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Escuchar cambios de autenticación
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -46,10 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (email: string, password: string) => {
+  const register = async (email: string, password: string, profile: UserProfile) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // En desarrollo, todos los usuarios registrados tienen acceso completo
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Actualizar displayName en Firebase Auth
+      await updateProfile(cred.user, { displayName: profile.nombre });
+
+      // Crear perfil + trial en Firestore
+      await createUserProfile(cred.user.uid, email, profile);
     } catch (error) {
       console.error('Error al registrar usuario:', error);
       throw error;
@@ -59,7 +108,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // Si es usuario nuevo de Google, crear perfil y trial
+      await ensureGoogleUserProfile(result.user);
     } catch (error) {
       console.error('Error al iniciar sesión con Google:', error);
       throw error;

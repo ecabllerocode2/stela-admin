@@ -103,7 +103,7 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
 
       const clienteNombre = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
 
-      // Usar texto en lugar de imagen para el logo en el export (STELA)
+      // Usar texto en lugar de imagen para el logo en el export (Stela)
       const logoSrc = null;
 
       // Agrupar items por nombre de prenda

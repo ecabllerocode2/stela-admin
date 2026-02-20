@@ -5,8 +5,7 @@ import {
     TruckIcon, ClockIcon, ChartBarIcon, TagIcon
 } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../credenciales';
+import { getDocs } from 'firebase/firestore';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts';
 import { userQuery } from '../utils/multitenancy';
@@ -107,7 +106,7 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, unit, icon: Icon, color
                         <p className="text-xs text-gray-400 mt-1">{description}</p>
                     )}
                 </div>
-                <div className={`h-12 w-12 p-3 rounded-full text-white ${kpiColorClasses[color]} flex-shrink-0`}>
+                <div className={`h-12 w-12 p-3 rounded-full text-white ${kpiColorClasses[color]} shrink-0`}>
                     <Icon className="h-full w-full" />
                 </div>
             </div>
@@ -155,11 +154,11 @@ const Dashboard: React.FC = () => {
           getDocs(userQuery('clientes', uid))
         ]);
 
-        setProductos(productosSnap.docs.map(d => ({ id: d.id, ...d.data() } as Producto)));
-        setOrdenes(ordenesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Orden)));
-        setClientesCredito(creditoSnap.docs.map(d => d.data() as ClienteCredito).filter(c => (c.saldoTotal || 0) > 0));
-        setInventoryMovements(movimientosSnap.docs.map(d => d.data() as InventoryMovement).filter(m => m.tipo === 'entrada'));
-        setClientes((await getDocs(userQuery('clientes', uid))).docs.map(d => ({ id: d.id, ...d.data() })));
+        setProductos(productosSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Producto)));
+        setOrdenes(ordenesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Orden)));
+        setClientesCredito(creditoSnap.docs.map((d: any) => d.data() as ClienteCredito).filter((c: any) => (c.saldoTotal || 0) > 0));
+        setInventoryMovements(movimientosSnap.docs.map((d: any) => d.data() as InventoryMovement).filter((m: any) => m.tipo === 'entrada'));
+        setClientes((await getDocs(userQuery('clientes', uid))).docs.map((d: any) => ({ id: d.id, ...d.data() })));
       } catch (error) {
         console.error('Error cargando datos del dashboard:', error);
       } finally {
@@ -584,7 +583,7 @@ const Dashboard: React.FC = () => {
                   to={alert.path}
                   className={`flex items-start p-4 rounded-lg bg-white shadow-sm border-l-4 ${colorClasses.border} hover:shadow-md transition duration-150 cursor-pointer ${colorClasses.bg}`}
                 >
-                  <alert.Icon className={`h-6 w-6 mr-3 mt-0.5 ${colorClasses.text} flex-shrink-0`} />
+                  <alert.Icon className={`h-6 w-6 mr-3 mt-0.5 ${colorClasses.text} shrink-0`} />
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-900">{alert.title}</p>
                     <p className="text-sm text-gray-600 mt-0.5">{alert.description}</p>

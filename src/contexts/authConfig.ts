@@ -4,11 +4,20 @@ import { auth as firebaseAuth } from '../credenciales';
 // Exportar la instancia de Auth centralizada
 export const auth: Auth = firebaseAuth;
 
+// Datos del perfil del usuario para registro
+export interface UserProfile {
+  nombre: string;
+  nombreNegocio?: string;
+  telefono: string;
+}
+
 // Tipo para el contexto de autenticación
 export interface AuthContextType {
   user: any;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, profile: UserProfile) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAuthorized: boolean;
@@ -16,3 +25,4 @@ export interface AuthContextType {
 
 // UID del usuario autorizado (reemplaza con Vite env variable VITE_AUTHORIZED_UID)
 export const AUTHORIZED_UID = import.meta.env.VITE_AUTHORIZED_UID ?? 'default-uid';
+
