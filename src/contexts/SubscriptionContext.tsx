@@ -33,6 +33,8 @@ export interface SubscriptionContextType {
   openPortal: () => Promise<void>;
   /** Cancela la suscripción al final del período */
   cancelSubscription: () => Promise<void>;
+  /** Cambia de plan (emprendedor ↔ business) */
+  changePlan: (newPlanId: 'emprendedor' | 'business') => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -168,6 +170,22 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     if (!data.success) throw new Error(data.error || 'Error al cancelar');
   }, [user]);
 
+  const changePlan = useCallback(
+    async (newPlanId: 'emprendedor' | 'business') => {
+      if (!user) throw new Error('No autenticado');
+
+      const res = await fetch(`${BACKEND_URL}/api/change-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, newPlanId }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Error al cambiar plan');
+    },
+    [user]
+  );
+
   return (
     <SubscriptionContext.Provider
       value={{
@@ -180,6 +198,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         subscribe,
         openPortal,
         cancelSubscription,
+        changePlan,
       }}
     >
       {children}

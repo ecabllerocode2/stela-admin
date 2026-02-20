@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../credenciales';
 import { useAuth } from '../contexts/AuthContext';
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL || 'https://stela-backend.vercel.app').trim();
@@ -15,15 +13,15 @@ const SubscriptionSuccess: React.FC = () => {
   const sessionId = searchParams.get('session_id');
   const hasUpdated = useRef(false);
 
-  // Al montar, actualizar el status de la suscripción en Firestore
-  // consultando el backend para obtener datos frescos de Stripe
+  // Al montar, llamar al backend para que sincronice Stripe -> Firestore.
+  // El backend escribe directamente en Firestore; el onSnapshot del
+  // SubscriptionContext lo detecta automaticamente.
   useEffect(() => {
     if (!user?.uid || hasUpdated.current) return;
     hasUpdated.current = true;
 
-    const updateSubscription = async () => {
+    const syncSubscription = async () => {
       try {
-        // Consultar el backend con sessionId para que sincronice directamente con Stripe
         const params = new URLSearchParams({ userId: user.uid });
         if (sessionId) params.append('sessionId', sessionId);
 
@@ -31,37 +29,24 @@ const SubscriptionSuccess: React.FC = () => {
           `${BACKEND_URL}/api/subscription-status?${params.toString()}`
         );
         const data = await res.json();
-
-        if (data.success && data.subscription) {
-          // Actualizar directamente en Firestore para que el listener lo capture
-          const newStatus = data.subscription.status || 'active';
-          await updateDoc(doc(db, 'subscriptions', user.uid), {
-            status: newStatus,
-            plan: data.subscription.plan,
-            stripeSubscriptionId: data.subscription.stripeSubscriptionId || null,
-            cancelAtPeriodEnd: data.subscription.cancelAtPeriodEnd || false,
-            updatedAt: serverTimestamp(),
-          });
-          console.log('✅ Suscripción actualizada tras checkout:', newStatus);
-        }
+        console.log('Sincronizacion post-checkout:', data.subscription?.status);
       } catch (err) {
-        console.warn('⚠️ No se pudo actualizar suscripción post-checkout:', err);
+        console.warn('No se pudo sincronizar suscripcion post-checkout:', err);
       }
     };
 
-    updateSubscription();
-  }, [user?.uid]);
+    syncSubscription();
+  }, [user?.uid, sessionId]);
 
-  // Countdown y redirect separados del setState
+  // Countdown
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => Math.max(0, prev - 1));
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-  // Navigate cuando countdown llega a 0
+  // Redirect cuando llega a 0
   useEffect(() => {
     if (countdown === 0) {
       navigate('/');
