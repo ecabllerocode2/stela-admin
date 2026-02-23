@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, query, collection, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../credenciales';
 import type { UserProfile } from './authConfig';
 
@@ -26,8 +26,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Genera un slug único (URL-safe) a partir del nombre del negocio o nombre personal */
+async function generateUniqueSlug(name: string): Promise<string> {
+  let base = (name || 'tienda')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+  if (!base) base = 'tienda';
+
+  let slug = base;
+  let attempt = 0;
+
+  while (true) {
+    const q = query(collection(db, 'users'), where('slug', '==', slug));
+    const snap = await getDocs(q);
+    if (snap.empty) return slug;
+    attempt++;
+    slug = `${base}-${attempt}`;
+  }
+}
+
 /** Crea el perfil del usuario y la suscripción trial en Firestore */
 async function createUserProfile(uid: string, email: string, profile: UserProfile) {
+  const slug = await generateUniqueSlug(profile.nombreNegocio || profile.nombre);
+
   // Guardar perfil en colección 'users'
   await setDoc(doc(db, 'users', uid), {
     uid,
@@ -35,6 +60,7 @@ async function createUserProfile(uid: string, email: string, profile: UserProfil
     nombre: profile.nombre,
     nombreNegocio: profile.nombreNegocio || '',
     telefono: profile.telefono,
+    slug,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

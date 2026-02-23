@@ -17,6 +17,7 @@ import {
   ArrowLeftOnRectangleIcon,
   SparklesIcon,
   Cog6ToothIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import Dashboard from './components/Dashboard';
 import Productos from './components/Productos';
@@ -43,6 +44,7 @@ import SubscriptionCancel from './components/SubscriptionCancel';
 import Reportes from './components/Reportes';
 import SistemaRecomendaciones from './components/SistemaRecomendaciones';
 import Configuracion from './components/Configuracion';
+import MiTienda from './components/MiTienda';
 
 
 // --- Configuración del Menú Lateral  ---
@@ -60,6 +62,7 @@ const menuItems = [
   { name: 'Pagos', path: '/pagos', icon: CurrencyDollarIcon },
   { name: 'Reportes', path: '/reportes', icon: ChartBarIcon },
   { name: 'divider', path: '', icon: HomeIcon },
+  { name: 'Mi Tienda en Línea', path: '/mi-tienda', icon: GlobeAltIcon },
   { name: 'Configuración', path: '/configuracion', icon: Cog6ToothIcon },
 ];
 
@@ -225,6 +228,7 @@ function AppRoutes() {
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
       <Route path="/recomendaciones" element={<ProtectedRoute><SistemaRecomendaciones /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
+      <Route path="/mi-tienda" element={<ProtectedRoute><MiTienda /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
 
       {/* 404 */}
