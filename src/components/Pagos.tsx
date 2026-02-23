@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
-  query, 
-  where, 
   getDocs, 
   doc, 
   updateDoc, 

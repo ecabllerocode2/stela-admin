@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import { XMarkIcon, MagnifyingGlassIcon, DocumentTextIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import ReciboPago from './ReciboPago';

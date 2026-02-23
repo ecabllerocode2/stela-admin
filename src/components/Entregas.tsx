@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { collection, getDocs, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { actualizarPerfilCliente } from '../utils/actualizarPerfil';

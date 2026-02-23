@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'; // Agregamos useMemo y useCallback
 import { Link } from 'react-router-dom';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import Select, { type StylesConfig } from 'react-select';
 import { useAuth } from '../contexts';

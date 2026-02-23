@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   collection,
   getDocs,
-  query,
-  orderBy,
   addDoc,
   runTransaction,
   doc,

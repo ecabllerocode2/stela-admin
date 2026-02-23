@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, where, doc, runTransaction, arrayUnion, Timestamp, increment } from 'firebase/firestore';
+import { collection, getDocs, doc, runTransaction, arrayUnion, Timestamp, increment } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { ArrowUturnLeftIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';

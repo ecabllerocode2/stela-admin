@@ -34,16 +34,6 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
   const contentRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const getImageDataUrl = async (url: string) => {
-    const resp = await fetch(url);
-    const blob = await resp.blob();
-    return await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-  };
-
   const handleExportPDF = async () => {
     // Preparar datos de cliente y prendas
     const clienteNombre = ordenesDestino.length
@@ -204,9 +194,6 @@ const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesD
 
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) throw new Error('No se pudo crear documento en iframe');
-
-      // Usar texto en lugar de imagen para el logo en la versión HTML del recibo
-      const logoSrc = null;
 
       // Colores Nude / Elegantes (iguales al PDF)
       const colorNudeHeader = 'rgb(244, 232, 228)'; // Nude rosado suave

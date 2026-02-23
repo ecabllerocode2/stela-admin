@@ -18,8 +18,7 @@ import {
   UsersIcon,
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../credenciales';
+import { getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { userQuery } from '../utils/multitenancy';
 

@@ -4,11 +4,8 @@ import Select, { type StylesConfig } from 'react-select';
 import {
   collection,
   getDocs,
-  query,
-  orderBy,
   doc,
   runTransaction,
-  where,
   Timestamp,
   arrayUnion,
   increment,
@@ -343,7 +340,7 @@ const NuevoPedido: React.FC = () => {
         const matchingOrders = allOrdenesSnap.docs.filter(d => {
           const data = d.data();
           const nombre = typeof data.cliente === 'string' ? data.cliente : data.cliente?.nombre;
-          return nombre === orderData.cliente.value && data.estadoPedido !== 'entregado';
+          return nombre === orderData.cliente?.value && data.estadoPedido !== 'entregado';
         });
 
         if (matchingOrders.length > 0) {
@@ -574,7 +571,7 @@ const NuevoPedido: React.FC = () => {
         // C. REGISTRAR MOVIMIENTO DE SALDO SI SE APLICÓ
         if (saldoAplicado > 0 && orderData.cliente) {
           const allCreditSnap = await getDocs(userQuery('clientes_credito', uid!));
-          const clienteCredDocs = allCreditSnap.docs.filter(d => d.data().cliente === orderData.cliente.value);
+          const clienteCredDocs = allCreditSnap.docs.filter(d => d.data().cliente === orderData.cliente?.value);
           
           if (clienteCredDocs.length > 0) {
             const creditDocRef = clienteCredDocs[0].ref;

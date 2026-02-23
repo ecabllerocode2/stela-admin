@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useSubscription } from '../contexts/SubscriptionContext';
-import { useAuth } from '../contexts/AuthContext';
 import {
   CheckIcon,
   SparklesIcon,
@@ -44,7 +43,6 @@ const PLANS = [
 
 const Planes: React.FC = () => {
   const { subscription, subscribe, openPortal, isActive, isTrialing } = useSubscription();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState('');

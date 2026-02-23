@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../credenciales';
+import { getDocs } from 'firebase/firestore';
 import showToast from '../utils/toast';
 import { CreditCardIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type { ClienteCredito } from '../types/orden';

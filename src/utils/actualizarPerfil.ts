@@ -3,7 +3,7 @@
  * Se ejecuta directamente en el frontend cuando se marca una orden como entregada
  */
 
-import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import { userQuery } from './multitenancy';
 

@@ -256,7 +256,7 @@ function App() {
 
 function AppContent() {
   const { isAuthenticated, loading: authLoading } = useAuth();
-  const { isActive, isExpired, loading: subLoading } = useSubscription();
+  const { isExpired, loading: subLoading } = useSubscription();
   const location = useLocation();
 
   // Rutas que no necesitan layout

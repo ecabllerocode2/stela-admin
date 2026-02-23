@@ -32,6 +32,8 @@
 
 import React, { useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
+
+const logoNegro = '/icons/stela-logo.png';
 import html2canvas from 'html2canvas';
 import { DocumentArrowDownIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import ReciboPago from './ReciboPago';

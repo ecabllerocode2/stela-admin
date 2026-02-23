@@ -6,8 +6,7 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../credenciales';
+import { getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { userQuery } from '../utils/multitenancy';
 import showToast from '../utils/toast';

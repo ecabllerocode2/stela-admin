@@ -6,7 +6,7 @@ import ResumenOrden from './ResumenOrden';
 import showToast from '../utils/toast';
 import { esEntregaPersonal } from '../utils/zonas';
 import { doc, deleteDoc } from 'firebase/firestore';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { getDocs } from 'firebase/firestore';
 import { db } from '../credenciales'; // Tu archivo de configuración
 import { useAuth } from '../contexts';
 import { userQuery } from '../utils/multitenancy';
