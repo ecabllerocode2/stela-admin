@@ -27,6 +27,14 @@ export interface SubscriptionContextType {
   trialDaysLeft: number;
   /** true si el trial ya expiró y no se suscribió */
   isExpired: boolean;
+  /** true si el plan actual es 'business' O está en trial (trial = acceso business) */
+  isBusiness: boolean;
+  /** true si el plan actual es 'emprendedor' (y no trial) */
+  isEmprendedor: boolean;
+  /** Plan actual: 'emprendedor' | 'business' | null */
+  currentPlan: 'emprendedor' | 'business' | null;
+  /** Límites del plan actual */
+  planLimits: PlanLimits;
   /** Abre Stripe Checkout para suscribirse */
   subscribe: (planId: 'emprendedor' | 'business') => Promise<void>;
   /** Abre el portal de Stripe para gestionar suscripción */
@@ -36,6 +44,58 @@ export interface SubscriptionContextType {
   /** Cambia de plan (emprendedor ↔ business) */
   changePlan: (newPlanId: 'emprendedor' | 'business') => Promise<void>;
 }
+
+export interface PlanLimits {
+  maxProducts: number;
+  maxImagesPerVariant: number;
+  maxAiDescriptions: number; // por mes, -1 = ilimitado
+  hasAdvancedReports: boolean;
+  hasRecommendations: boolean;
+  hasOnlineStore: boolean;
+  hasReturns: boolean;
+  hasCreditBalance: boolean;
+  hasPaymentHistory: boolean;
+  hasReceipts: boolean;
+  hasWatermark: boolean;
+  hasAdvancedCRM: boolean;
+  hasAdvancedInventory: boolean; // merma, regalos
+  hasAdvancedDashboard: boolean;
+}
+
+export const PLAN_LIMITS: Record<'emprendedor' | 'business', PlanLimits> = {
+  emprendedor: {
+    maxProducts: 100,
+    maxImagesPerVariant: 3,
+    maxAiDescriptions: 10,
+    hasAdvancedReports: false,
+    hasRecommendations: false,
+    hasOnlineStore: false,
+    hasReturns: false,
+    hasCreditBalance: false,
+    hasPaymentHistory: false,
+    hasReceipts: false,
+    hasWatermark: false,
+    hasAdvancedCRM: false,
+    hasAdvancedInventory: false,
+    hasAdvancedDashboard: false,
+  },
+  business: {
+    maxProducts: 500,
+    maxImagesPerVariant: 8,
+    maxAiDescriptions: -1,
+    hasAdvancedReports: true,
+    hasRecommendations: true,
+    hasOnlineStore: true,
+    hasReturns: true,
+    hasCreditBalance: true,
+    hasPaymentHistory: true,
+    hasReceipts: true,
+    hasWatermark: true,
+    hasAdvancedCRM: true,
+    hasAdvancedInventory: true,
+    hasAdvancedDashboard: true,
+  },
+};
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
@@ -120,14 +180,36 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       (isTrialing && trialHasExpired && !hasRealSubscription) ||
       (!isActive && subscription.hasHadTrial));
 
+  // ─── Plan-level gating ──────────────────────────────────────────
+  // Trial = acceso Business completo. Si no hay trial, usar plan real.
+  const currentPlan: 'emprendedor' | 'business' | null =
+    isTrialing && !trialHasExpired
+      ? 'business' // trial = business completo
+      : subscription?.plan || null;
+
+  const isBusiness = currentPlan === 'business';
+  const isEmprendedor = currentPlan === 'emprendedor';
+  const planLimits = PLAN_LIMITS[currentPlan || 'emprendedor'];
+
+  // ─── Helper para obtener headers autenticados ───────────────────
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    if (!user) throw new Error('No autenticado');
+    const token = await user.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+  }, [user]);
+
   // ─── Acciones ───────────────────────────────────────────────────
   const subscribe = useCallback(
     async (planId: 'emprendedor' | 'business') => {
       if (!user) throw new Error('No autenticado');
+      const headers = await getAuthHeaders();
 
       const res = await fetch(`${BACKEND_URL}/api/create-checkout-session`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           planId,
           userId: user.uid,
@@ -140,50 +222,53 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (!data.success) throw new Error(data.error || 'Error al crear sesión');
       window.location.href = data.url;
     },
-    [user]
+    [user, getAuthHeaders]
   );
 
   const openPortal = useCallback(async () => {
     if (!user) throw new Error('No autenticado');
+    const headers = await getAuthHeaders();
 
     const res = await fetch(`${BACKEND_URL}/api/create-portal-session`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ userId: user.uid }),
     });
 
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Error al crear portal');
     window.location.href = data.url;
-  }, [user]);
+  }, [user, getAuthHeaders]);
 
   const cancelSubscription = useCallback(async () => {
     if (!user) throw new Error('No autenticado');
+    const headers = await getAuthHeaders();
 
     const res = await fetch(`${BACKEND_URL}/api/cancel-subscription`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ userId: user.uid }),
     });
 
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Error al cancelar');
-  }, [user]);
+  }, [user, getAuthHeaders]);
 
   const changePlan = useCallback(
     async (newPlanId: 'emprendedor' | 'business') => {
       if (!user) throw new Error('No autenticado');
+      const headers = await getAuthHeaders();
 
       const res = await fetch(`${BACKEND_URL}/api/change-plan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ userId: user.uid, newPlanId }),
       });
 
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error al cambiar plan');
     },
-    [user]
+    [user, getAuthHeaders]
   );
 
   return (
@@ -195,6 +280,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         isTrialing,
         trialDaysLeft,
         isExpired,
+        isBusiness,
+        isEmprendedor,
+        currentPlan,
+        planLimits,
         subscribe,
         openPortal,
         cancelSubscription,

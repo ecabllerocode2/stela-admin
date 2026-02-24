@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'; // Agregamos useMemo y useCallback
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import Select, { type StylesConfig } from 'react-select';
-import { useAuth } from '../contexts';
+import { useAuth, useSubscription } from '../contexts';
 import { userQuery } from '../utils/multitenancy';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 import { 
   PlusIcon, 
   PencilSquareIcon, 
@@ -124,6 +125,8 @@ const getFlatCategoryOptions = (): OptionType[] => {
 
 const Productos = () => {
   const { user } = useAuth();
+  const { planLimits, isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -508,13 +511,36 @@ const Productos = () => {
           <h1 className="text-2xl font-bold text-gray-800">Productos ({filteredProducts.length}/{products.length})</h1>
           <p className="text-gray-500 text-sm mt-1">Gestiona tu inventario y catálogo.</p>
         </div>
-        <Link 
-          to="/productos/crear" 
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Nuevo Producto</span>
-        </Link>
+        {products.length >= planLimits.maxProducts ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
+              Límite: {products.length}/{planLimits.maxProducts} productos
+            </span>
+            <button
+              onClick={() => requireBusiness(
+                'Más productos',
+                `Has alcanzado el límite de ${planLimits.maxProducts} productos de tu plan. Elimina productos existentes o mejora tu plan para agregar más.`
+              )}
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-sm"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Nuevo Producto</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {products.length}/{planLimits.maxProducts} productos
+            </span>
+            <Link 
+              to="/productos/crear" 
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Nuevo Producto</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* --- PANEL DE FILTROS ACTUALIZADO --- */}
@@ -1025,6 +1051,9 @@ const Productos = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de upgrade */}
+      <UpgradeModal {...upgradeProps} />
     </div>
   );
 };

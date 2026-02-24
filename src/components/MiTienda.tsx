@@ -15,6 +15,7 @@ import {
   ArrowTopRightOnSquareIcon,
   ClipboardDocumentIcon,
   EyeIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 
 // Simple SVG icons for social media (to avoid adding react-icons dependency)
@@ -36,11 +37,16 @@ const WhatsAppIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   </svg>
 );
 
+const BACKEND_URL = (import.meta.env.VITE_API_URL || 'https://stela-backend.vercel.app').trim();
+
 const MiTienda: React.FC = () => {
   const { profile, loading, storeName, storeUrl, updateProfile } = useUserProfile();
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [logoModalOpen, setLogoModalOpen] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Form state for store configuration
   const [formData, setFormData] = useState<Partial<StoreConfig & { nombreNegocio?: string; telefono?: string }>>({});
@@ -55,7 +61,6 @@ const MiTienda: React.FC = () => {
         telefono: profile.telefono || '',
         descripcionTienda: profile.descripcionTienda || '',
         logo: profile.logo || '',
-        bannerUrl: profile.bannerUrl || '',
         instagram: profile.instagram || '',
         facebook: profile.facebook || '',
         direccion: profile.direccion || '',
@@ -104,6 +109,26 @@ const MiTienda: React.FC = () => {
   const handleOpenStore = () => {
     if (storeUrl) {
       window.open(storeUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append('files', file);
+      const res = await fetch(`${BACKEND_URL}/api/upload`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      if (!data.success || !data.urls?.length) throw new Error('No se obtuvo URL de la imagen');
+      const url = data.urls[0];
+      handleFieldChange('logo', url);
+      setLogoModalOpen(false);
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Error al subir el logo' });
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -347,42 +372,36 @@ const MiTienda: React.FC = () => {
             />
           </div>
 
-          {/* Logo URL */}
+          {/* Logo */}
           <div>
-            <label htmlFor="logo" className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               <PhotoIcon className="inline h-4 w-4 mr-1 text-gray-400" />
-              URL del Logo
+              Logo de la tienda
             </label>
-            <input
-              id="logo"
-              type="url"
-              value={formData.logo || ''}
-              onChange={(e) => handleFieldChange('logo', e.target.value)}
-              placeholder="https://ejemplo.com/mi-logo.png"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
-            {formData.logo && (
-              <div className="mt-2 flex items-center gap-2">
-                <img src={formData.logo} alt="Logo preview" className="h-10 w-10 rounded-full object-cover border" />
-                <span className="text-xs text-gray-500">Vista previa del logo</span>
+            <div className="flex items-center gap-4">
+              {formData.logo ? (
+                <img src={formData.logo} alt="Logo" className="h-16 w-16 rounded-xl object-cover border border-gray-200 shadow-sm" />
+              ) : (
+                <div className="h-16 w-16 rounded-xl bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center">
+                  <PhotoIcon className="h-6 w-6 text-gray-400" />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLogoModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  <ArrowUpTrayIcon className="h-4 w-4" />
+                  {formData.logo ? 'Cambiar logo' : 'Subir logo'}
+                </button>
+                {formData.logo && (
+                  <button type="button" onClick={() => handleFieldChange('logo', '')} className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                    Quitar logo
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-
-          {/* Banner URL */}
-          <div>
-            <label htmlFor="bannerUrl" className="block text-sm font-medium text-gray-700 mb-1">
-              <PhotoIcon className="inline h-4 w-4 mr-1 text-gray-400" />
-              URL del Banner
-            </label>
-            <input
-              id="bannerUrl"
-              type="url"
-              value={formData.bannerUrl || ''}
-              onChange={(e) => handleFieldChange('bannerUrl', e.target.value)}
-              placeholder="https://ejemplo.com/mi-banner.jpg"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
+            </div>
           </div>
 
           {/* Teléfono / WhatsApp */}
@@ -521,7 +540,6 @@ const MiTienda: React.FC = () => {
                     telefono: profile.telefono || '',
                     descripcionTienda: profile.descripcionTienda || '',
                     logo: profile.logo || '',
-                    bannerUrl: profile.bannerUrl || '',
                     instagram: profile.instagram || '',
                     facebook: profile.facebook || '',
                     direccion: profile.direccion || '',
@@ -551,6 +569,47 @@ const MiTienda: React.FC = () => {
           </div>
         )}
       </form>
+
+      {/* Modal de carga de logo */}
+      {logoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800">Subir Logo</h3>
+              <button onClick={() => setLogoModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div
+                className="border-2 border-dashed border-indigo-300 rounded-xl bg-indigo-50 p-8 text-center cursor-pointer hover:bg-indigo-100 transition-colors"
+                onClick={() => logoFileInputRef.current?.click()}
+              >
+                <ArrowUpTrayIcon className="h-10 w-10 text-indigo-400 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-gray-700">Haz clic para seleccionar una imagen</p>
+                <p className="text-xs text-gray-500 mt-1">PNG, JPG, WEBP — máx. 10 MB</p>
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) await handleLogoUpload(file);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+              {uploadingLogo && (
+                <div className="flex items-center justify-center gap-2 text-indigo-600">
+                  <span className="h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-medium">Subiendo imagen…</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

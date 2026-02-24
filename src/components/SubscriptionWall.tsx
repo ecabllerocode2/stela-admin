@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LockClosedIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { LockClosedIcon, SparklesIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 /**
  * Pantalla que se muestra cuando el trial expiró o la suscripción está inactiva.
@@ -11,7 +11,7 @@ const SubscriptionWall: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full text-center">
+      <div className="max-w-2xl w-full text-center">
         {/* Icono */}
         <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
           <LockClosedIcon className="h-8 w-8 text-blue-600" />
@@ -31,10 +31,17 @@ const SubscriptionWall: React.FC = () => {
           {/* Emprendedor */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 text-left">
             <h3 className="font-semibold text-gray-900 mb-1">Emprendedor</h3>
-            <div className="text-2xl font-bold text-gray-900 mb-1">
+            <div className="text-2xl font-bold text-gray-900 mb-3">
               $250<span className="text-sm font-normal text-gray-500">/mes</span>
             </div>
-            <p className="text-xs text-gray-500">Ideal para iniciar</p>
+            <ul className="space-y-1.5 text-sm text-gray-600">
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Hasta 100 productos</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Pedidos y ventas</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Inventario básico</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> CRM clientes</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Reportes básicos</li>
+              <li className="flex items-center gap-1.5 text-gray-400"><XMarkIcon className="h-4 w-4 text-gray-300 shrink-0" /> Sin tienda en línea</li>
+            </ul>
           </div>
 
           {/* Business */}
@@ -43,10 +50,17 @@ const SubscriptionWall: React.FC = () => {
               <SparklesIcon className="h-3 w-3" /> Popular
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Business</h3>
-            <div className="text-2xl font-bold text-gray-900 mb-1">
+            <div className="text-2xl font-bold text-gray-900 mb-3">
               $499<span className="text-sm font-normal text-gray-500">/mes</span>
             </div>
-            <p className="text-xs text-gray-500">Para negocios en crecimiento</p>
+            <ul className="space-y-1.5 text-sm text-gray-600">
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Hasta 500 productos</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Todo lo del Emprendedor</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Tienda en línea propia</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Reportes avanzados + CSV/XML</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Recomendaciones IA</li>
+              <li className="flex items-center gap-1.5"><CheckIcon className="h-4 w-4 text-green-500 shrink-0" /> Devoluciones y saldo a favor</li>
+            </ul>
           </div>
         </div>
 

@@ -32,11 +32,10 @@
 
 import React, { useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
-
-const logoNegro = '/icons/stela-logo.png';
 import html2canvas from 'html2canvas';
 import { DocumentArrowDownIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import ReciboPago from './ReciboPago';
+import { useUserProfile } from '../hooks/useUserProfile';
 
 interface Orden {
   id: string;
@@ -68,6 +67,7 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
   const contentRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [reciboSeleccionado, setReciboSeleccionado] = useState<{ pago: any; ordenesDestino: any[] } | null>(null);
+  const { storeName } = useUserProfile();
 
   // En ResumenOrden.tsx
 
@@ -105,7 +105,7 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
 
       const clienteNombre = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
 
-      // Usar texto en lugar de imagen para el logo en el export (Stela)
+      // Usar texto con nombre del negocio en lugar de imagen para el logo en el export
       const logoSrc = null;
 
       // Agrupar items por nombre de prenda
@@ -180,7 +180,7 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
       </head><body>
         <div class="container">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <img src="${logoSrc}" alt="logo" style="height:42px;object-fit:contain;"/>
+            <div style="font-size:22px;font-weight:700;color:#111827;letter-spacing:0.5px;">${storeName}</div>
             <div>
               <h1 style="font-size:20px;margin:0;color:#111827;">Resumen de Orden</h1>
               <p style="color:#6b7280;margin:2px 0 0 0;">Cliente: ${clienteNombre || '-'}</p>
@@ -473,13 +473,6 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
 
       const clienteNombre = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
 
-      // Intentar convertir el logo a data URL
-      let logoSrc = logoNegro;
-      try {
-        const logoData = await toDataURL(logoNegro as string);
-        if (logoData) logoSrc = logoData;
-      } catch (e) {}
-
       // Agrupar items por nombre de prenda
       const itemsAgrupadosMap = new Map<string, any>();
       (orden.items || []).forEach((item: any) => {
@@ -552,7 +545,7 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
       </head><body>
         <div class="container">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-            <img src="${logoSrc}" alt="logo" style="height:42px;object-fit:contain;"/>
+            <div style="font-size:22px;font-weight:700;color:#111827;letter-spacing:0.5px;">${storeName}</div>
             <div>
               <h1 style="font-size:20px;margin:0;color:#111827;">Resumen de Orden</h1>
               <p style="color:#6b7280;margin:2px 0 0 0;">Cliente: ${clienteNombre || '-'}</p>
@@ -834,12 +827,12 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Encabezado */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-start">
-          <div className="flex items-center gap-4">
-            <img src={logoNegro} alt="logo" className="h-10 object-contain" crossOrigin="anonymous" referrerPolicy="no-referrer" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Resumen de Orden</h2>
-              <p className="text-sm text-gray-500">ID: {orden.id.slice(0, 12)}</p>
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-5 flex justify-between items-start z-10">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Resumen de Orden</span>
+              <span className="text-xl font-bold text-gray-900">{storeName}</span>
+              <p className="text-xs text-gray-400 mt-0.5">ID: {orden.id.slice(0, 12)}</p>
             </div>
           </div>
           <button

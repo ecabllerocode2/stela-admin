@@ -14,8 +14,9 @@ import {
 import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../credenciales';
 import showToast from '../utils/toast';
-import { useAuth } from '../contexts';
+import { useAuth, useSubscription } from '../contexts';
 import { userQuery, withUserId } from '../utils/multitenancy';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 
 // --- Interfaces basadas en tus capturas de Firestore ---
 interface PerfilRecomendacion {
@@ -176,6 +177,8 @@ const Clientes: React.FC = () => {
   }, [clientes, searchTerm, estadoFiltro, ultimaCompraFiltro, cumpleMesFiltro]);
 
   const { user } = useAuth();
+  const { isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
 
   // Carga inicial de clientes desde Firestore
@@ -608,6 +611,8 @@ const EditClientModal: React.FC<{
   onClose: () => void;
   onSave: (id: string, data: Partial<Cliente>) => void;
 }> = ({ client, onClose, onSave }) => {
+  const { isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const [formData, setFormData] = useState({ 
     cliente: client.cliente, 
     telefono: client.telefono, 
@@ -695,6 +700,7 @@ const EditClientModal: React.FC<{
 
             {/* Perfil de Consumo */}
             {client.perfil_recomendacion ? (
+              isBusiness ? (
               <>
                 <div>
                   <p className="text-xs font-bold text-gray-600 uppercase mb-3">Datos de Compra</p>
@@ -796,6 +802,16 @@ const EditClientModal: React.FC<{
                   💡 Insights: Rango de precio recomendado ${client.perfil_recomendacion?.rango_precio_min || 0} - ${client.perfil_recomendacion?.rango_precio_max || 0}. Cliente con {client.variedad_colores || 0} colores diferentes en su historial.
                 </div>
               </>
+              ) : (
+                /* Emprendedor: CRM avanzado bloqueado */
+                <div 
+                  onClick={() => requireBusiness('CRM Avanzado', 'El perfil de consumo detallado, clasificación VIP y análisis de comportamiento de clientes están disponibles en el Plan Business.')}
+                  className="p-4 bg-purple-50 border border-purple-200 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors"
+                >
+                  <p className="text-sm text-purple-700 font-medium flex items-center gap-1">🔒 Perfil de Consumo — Plan Business</p>
+                  <p className="text-xs text-purple-600 mt-1">Mejora tu plan para ver el análisis detallado de este cliente: frecuencia, ticket promedio, categorías favoritas y más.</p>
+                </div>
+              )
             ) : (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700 font-medium">ℹ️ Sin perfil generado</p>
@@ -805,6 +821,9 @@ const EditClientModal: React.FC<{
           </div>
         </div>
       </div>
+
+      {/* Modal de upgrade */}
+      <UpgradeModal {...upgradeProps} />
     </div>
   );
 };

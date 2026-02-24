@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
 
 import {
   HomeIcon,
@@ -31,7 +32,6 @@ import Clientes from './components/Clientes';
 import Inventario from './components/Inventario';
 import MarcaAgua from './components/MarcaAgua';
 import Devoluciones from './components/Devoluciones';
-import SaldoAFavor from './components/SaldoAFavor';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -45,6 +45,9 @@ import Reportes from './components/Reportes';
 import SistemaRecomendaciones from './components/SistemaRecomendaciones';
 import Configuracion from './components/Configuracion';
 import MiTienda from './components/MiTienda';
+import BusinessGate from './components/BusinessGate';
+import SaldoAFavor from './components/SaldoAFavor';
+import LandingPage from './components/LandingPage';
 
 
 // --- Configuración del Menú Lateral  ---
@@ -52,24 +55,25 @@ const menuItems = [
   { name: 'Dashboard', path: '/', icon: HomeIcon },
   { name: 'Ordenes', path: '/pedidos', icon: ShoppingCartIcon },
   { name: 'Clientes', path: '/clientes', icon: UserIcon },
-  { name: 'Recomendaciones', path: '/recomendaciones', icon: SparklesIcon },
+  { name: 'Recomendaciones', path: '/recomendaciones', icon: SparklesIcon, businessOnly: true },
   { name: 'Entregas', path: '/entregas', icon: TruckIcon },
-  { name: 'Saldo a Favor', path: '/saldo-a-favor', icon: CurrencyDollarIcon },
   { name: 'Productos', path: '/productos', icon: CubeIcon },
   { name: 'Inventario', path: '/inventario', icon: ArchiveBoxIcon },
-  { name: 'Marca de Agua', path: '/marca-agua', icon: PhotoIcon },
+  { name: 'Marca de Agua', path: '/marca-agua', icon: PhotoIcon, businessOnly: true },
   { name: 'Compras', path: '/compras', icon: TruckIcon },
   { name: 'Pagos', path: '/pagos', icon: CurrencyDollarIcon },
   { name: 'Reportes', path: '/reportes', icon: ChartBarIcon },
   { name: 'divider', path: '', icon: HomeIcon },
-  { name: 'Mi Tienda en Línea', path: '/mi-tienda', icon: GlobeAltIcon },
+  { name: 'Mi Tienda en Línea', path: '/mi-tienda', icon: GlobeAltIcon, businessOnly: true },
   { name: 'Configuración', path: '/configuracion', icon: Cog6ToothIcon },
 ];
 
 function Layout({ children }: { children: React.ReactNode }) {
+  useAutoUpdate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { logout, user } = useAuth();
+  const { isBusiness } = useSubscription();
   const topBarRef = useRef<HTMLDivElement>(null);
   const [topHeight, setTopHeight] = useState(64);
 
@@ -160,6 +164,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               return <div key={`divider-${index}`} className="my-2 border-t border-gray-200" />;
             }
             const isActive = location.pathname === item.path;
+            const showProBadge = item.businessOnly && !isBusiness;
             return (
               <Link
                 key={item.name}
@@ -173,7 +178,12 @@ function Layout({ children }: { children: React.ReactNode }) {
                 `}
               >
                 <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {showProBadge && (
+                  <span className="ml-auto text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+                    PRO
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -219,17 +229,19 @@ function AppRoutes() {
       <Route path="/pedidos/editar/:id" element={<ProtectedRoute><NuevoPedido /></ProtectedRoute>} />
       <Route path="/ordenes/editar/:id" element={<ProtectedRoute><NuevoPedido /></ProtectedRoute>} />
       <Route path="/entregas" element={<ProtectedRoute><Entregas /></ProtectedRoute>} />
-      <Route path="/devoluciones" element={<ProtectedRoute><Devoluciones /></ProtectedRoute>} />
-      <Route path="/saldo-a-favor" element={<ProtectedRoute><SaldoAFavor /></ProtectedRoute>} />
-      <Route path="/inventario" element={<ProtectedRoute><Inventario /></ProtectedRoute>} />
-      <Route path="/marca-agua" element={<ProtectedRoute><MarcaAgua /></ProtectedRoute>} />
       <Route path="/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
-      <Route path="/pagos" element={<ProtectedRoute><Pagos /></ProtectedRoute>} />
       <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-      <Route path="/recomendaciones" element={<ProtectedRoute><SistemaRecomendaciones /></ProtectedRoute>} />
+      <Route path="/inventario" element={<ProtectedRoute><Inventario /></ProtectedRoute>} />
       <Route path="/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
-      <Route path="/mi-tienda" element={<ProtectedRoute><MiTienda /></ProtectedRoute>} />
+      <Route path="/pagos" element={<ProtectedRoute><Pagos /></ProtectedRoute>} />
       <Route path="/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
+
+      {/* Rutas exclusivas Business (visibles pero con gate) */}
+      <Route path="/devoluciones" element={<ProtectedRoute><BusinessGate featureName="Devoluciones y Reembolsos" featureDescription="Procesa devoluciones, gestiona reembolsos y genera créditos a favor de tus clientes automáticamente."><Devoluciones /></BusinessGate></ProtectedRoute>} />
+      <Route path="/saldo-a-favor" element={<ProtectedRoute><BusinessGate featureName="Saldo a Favor" featureDescription="Visualiza y gestiona los créditos acumulados de tus clientes por devoluciones."><SaldoAFavor /></BusinessGate></ProtectedRoute>} />
+      <Route path="/marca-agua" element={<ProtectedRoute><BusinessGate featureName="Marca de Agua Personalizada" featureDescription="Añade tu marca de agua personalizada a las imágenes de tus productos para proteger tu contenido."><MarcaAgua /></BusinessGate></ProtectedRoute>} />
+      <Route path="/recomendaciones" element={<ProtectedRoute><BusinessGate featureName="Recomendaciones Inteligentes" featureDescription="Descubre qué productos recomendar a cada cliente y qué clientes son ideales para cada producto, con nuestro motor de IA."><SistemaRecomendaciones /></BusinessGate></ProtectedRoute>} />
+      <Route path="/mi-tienda" element={<ProtectedRoute><BusinessGate featureName="Mi Tienda en Línea" featureDescription="Crea tu tienda online personalizada con tu marca, colores y productos. Tus clientes podrán ver tu catálogo y comprarte por WhatsApp."><MiTienda /></BusinessGate></ProtectedRoute>} />
 
       {/* 404 */}
       <Route path="*" element={<ProtectedRoute><div className="text-gray-500">Próximamente...</div></ProtectedRoute>} />
@@ -262,6 +274,11 @@ function AppContent() {
   // Rutas que no necesitan layout
   const noLayoutRoutes = ['/login', '/planes', '/subscription/success', '/subscription/cancel'];
   const isNoLayoutRoute = noLayoutRoutes.some((r) => location.pathname.startsWith(r));
+
+  // Landing page para usuarios no autenticados en la ruta raíz
+  if (!isAuthenticated && !authLoading && location.pathname === '/') {
+    return <LandingPage />;
+  }
 
   // No mostrar layout en login
   if (location.pathname === '/login' || !isAuthenticated) {

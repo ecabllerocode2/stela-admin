@@ -4,6 +4,9 @@ import {
   CheckIcon,
   SparklesIcon,
   ArrowLeftIcon,
+  XMarkIcon,
+  ArrowsRightLeftIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,13 +15,30 @@ const PLANS = [
     id: 'emprendedor' as const,
     name: 'Emprendedor',
     price: 250,
-    description: 'Ideal para quienes inician su negocio',
+    description: 'Ideal para quienes inician su negocio de moda',
     features: [
-      'Gestión de productos',
-      'Control de inventario',
-      'Registro de clientes',
-      'Órdenes y pedidos',
-      'Reportes básicos',
+      { text: 'Hasta 100 productos', included: true },
+      { text: '3 imágenes por variante', included: true },
+      { text: '10 descripciones con IA al mes', included: true },
+      { text: 'Pedidos y ventas', included: true },
+      { text: 'Inventario (entrada de stock)', included: true },
+      { text: 'CRM Clientes básico', included: true },
+      { text: 'Compras a proveedores', included: true },
+      { text: 'Entregas básicas', included: true },
+      { text: 'Cuentas por cobrar básico', included: true },
+      { text: 'Dashboard (4 KPIs esenciales)', included: true },
+      { text: 'Reportes básicos (vista general)', included: true },
+      { text: 'Inventario avanzado (merma/regalos)', included: false },
+      { text: 'Devoluciones y reembolsos', included: false },
+      { text: 'Saldo a favor de clientes', included: false },
+      { text: 'Recibos y resúmenes PDF', included: false },
+      { text: 'CRM avanzado (perfiles, clasificación)', included: false },
+      { text: 'Reportes avanzados (4 vistas + export)', included: false },
+      { text: 'Recomendaciones inteligentes', included: false },
+      { text: 'Tienda en línea personalizada', included: false },
+      { text: 'Asesora de Estilo IA "Mia"', included: false },
+      { text: 'Marca de agua personalizada', included: false },
+      { text: 'Historial de pagos completo', included: false },
     ],
     popular: false,
   },
@@ -26,26 +46,43 @@ const PLANS = [
     id: 'business' as const,
     name: 'Business',
     price: 499,
-    description: 'Para negocios en crecimiento',
+    description: 'Para negocios en crecimiento que quieren vender más',
     features: [
-      'Todo lo del plan Emprendedor',
-      'Entregas y logística',
-      'Pagos y finanzas',
-      'Saldo a favor de clientes',
-      'Sistema de recomendaciones IA',
-      'Marca de agua personalizada',
-      'Reportes avanzados',
-      'Soporte prioritario',
+      { text: 'Hasta 500 productos', included: true },
+      { text: '8 imágenes por variante', included: true },
+      { text: 'Descripciones con IA ilimitadas', included: true },
+      { text: 'Pedidos y ventas', included: true },
+      { text: 'Inventario completo (+ merma + regalos)', included: true },
+      { text: 'CRM avanzado (perfiles, clasificación VIP)', included: true },
+      { text: 'Compras a proveedores', included: true },
+      { text: 'Entregas con zonas y logística', included: true },
+      { text: 'Cuentas por cobrar + aging', included: true },
+      { text: 'Dashboard completo (8 KPIs + alertas)', included: true },
+      { text: 'Reportes avanzados (4 vistas + CSV/XML)', included: true },
+      { text: 'Devoluciones y reembolsos', included: true },
+      { text: 'Saldo a favor de clientes', included: true },
+      { text: 'Recibos y resúmenes PDF', included: true },
+      { text: 'Historial de pagos completo', included: true },
+      { text: 'Recomendaciones inteligentes', included: true },
+      { text: 'Tienda en línea personalizada', included: true },
+      { text: 'Asesora de Estilo IA "Mia"', included: true },
+      { text: 'Marca de agua personalizada', included: true },
+      { text: 'Soporte prioritario (WhatsApp)', included: true },
     ],
     popular: true,
   },
 ];
 
 const Planes: React.FC = () => {
-  const { subscription, subscribe, openPortal, isActive, isTrialing } = useSubscription();
+  const { subscription, subscribe, openPortal, changePlan, isActive, isTrialing } = useSubscription();
   const navigate = useNavigate();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [changePlanModal, setChangePlanModal] = useState<{
+    open: boolean;
+    targetPlanId: 'emprendedor' | 'business' | null;
+    isUpgrade: boolean;
+  }>({ open: false, targetPlanId: null, isUpgrade: false });
 
   const handleSubscribe = async (planId: 'emprendedor' | 'business') => {
     setError('');
@@ -71,8 +108,30 @@ const Planes: React.FC = () => {
     }
   };
 
+  const handleChangePlanClick = (targetPlanId: 'emprendedor' | 'business') => {
+    const isUpgrade = targetPlanId === 'business';
+    setChangePlanModal({ open: true, targetPlanId, isUpgrade });
+  };
+
+  const handleConfirmChangePlan = async () => {
+    if (!changePlanModal.targetPlanId) return;
+    setError('');
+    setLoadingPlan(changePlanModal.targetPlanId);
+    setChangePlanModal(prev => ({ ...prev, open: false }));
+    try {
+      await changePlan(changePlanModal.targetPlanId);
+    } catch (err: any) {
+      setError(err.message || 'Error al cambiar de plan');
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   const currentPlan = subscription?.plan;
   const hasActiveSub = isActive && !isTrialing;
+  const targetPlanName = changePlanModal.targetPlanId === 'business' ? 'Business' : 'Emprendedor';
+  const targetPlanPrice = changePlanModal.targetPlanId === 'business' ? 499 : 250;
+  const currentPlanName = currentPlan === 'business' ? 'Business' : 'Emprendedor';
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -136,11 +195,15 @@ const Planes: React.FC = () => {
                 </div>
 
                 {/* Features */}
-                <ul className="space-y-3 mb-8 flex-1">
+                <ul className="space-y-2.5 mb-8 flex-1">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
-                      <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      {feature}
+                    <li key={feature.text} className={`flex items-start gap-2 text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
+                      {feature.included ? (
+                        <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <XMarkIcon className="h-5 w-5 text-gray-300 flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className={feature.included ? '' : 'line-through'}>{feature.text}</span>
                     </li>
                   ))}
                 </ul>
@@ -154,7 +217,31 @@ const Planes: React.FC = () => {
                   >
                     {loadingPlan === 'portal' ? 'Abriendo...' : 'Gestionar Suscripción'}
                   </button>
+                ) : hasActiveSub ? (
+                  /* Usuario con suscripción activa cambiando a otro plan */
+                  <button
+                    onClick={() => handleChangePlanClick(plan.id)}
+                    disabled={!!loadingPlan}
+                    className={`w-full py-2.5 px-4 rounded-lg font-semibold text-white transition-colors flex items-center justify-center gap-2 ${
+                      plan.popular
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-gray-800 hover:bg-gray-900'
+                    } ${loadingPlan ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {loadingPlan === plan.id ? (
+                      <>
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowsRightLeftIcon className="h-4 w-4" />
+                        Cambiar a {plan.name}
+                      </>
+                    )}
+                  </button>
                 ) : (
+                  /* Usuario sin suscripción, nueva suscripción */
                   <button
                     onClick={() => handleSubscribe(plan.id)}
                     disabled={!!loadingPlan}
@@ -169,8 +256,6 @@ const Planes: React.FC = () => {
                         <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         Procesando...
                       </span>
-                    ) : hasActiveSub ? (
-                      'Cambiar a este plan'
                     ) : (
                       'Suscribirme'
                     )}
@@ -190,15 +275,113 @@ const Planes: React.FC = () => {
             Puedes cancelar en cualquier momento. Sin contratos a largo plazo.
           </p>
           {hasActiveSub && (
-            <button
-              onClick={handleManage}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Administrar método de pago y facturación →
-            </button>
+            <>
+              <p className="text-sm text-gray-500">
+                Al cambiar de plan, solo se cobra la diferencia proporcional del período restante.
+              </p>
+              <button
+                onClick={handleManage}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Administrar método de pago y facturación →
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Modal de confirmación de cambio de plan */}
+      {changePlanModal.open && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full relative">
+            {/* Close button */}
+            <button
+              onClick={() => setChangePlanModal({ open: false, targetPlanId: null, isUpgrade: false })}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+
+            <div className="p-6">
+              {/* Icon */}
+              <div className="mx-auto w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <ArrowsRightLeftIcon className="h-7 w-7 text-blue-600" />
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                {changePlanModal.isUpgrade ? 'Mejorar' : 'Cambiar'} a Plan {targetPlanName}
+              </h3>
+
+              <p className="text-sm text-gray-500 text-center mb-5">
+                {currentPlanName} → {targetPlanName} (${targetPlanPrice} MXN/mes)
+              </p>
+
+              {/* Proration info box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 space-y-3">
+                <div className="flex items-start gap-2">
+                  <InformationCircleIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-900">
+                    <p className="font-semibold mb-1">¿Cómo funciona el cobro?</p>
+                    {changePlanModal.isUpgrade ? (
+                      <ul className="space-y-1.5 text-blue-800">
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span><strong>Acceso inmediato</strong> a todas las funcionalidades Business.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span><strong>Solo pagas la diferencia</strong> proporcional por los días que faltan de tu ciclo actual. No se te cobra el mes completo.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>A partir del <strong>próximo ciclo de facturación</strong>, se te cobrará el precio completo del plan Business ($499 MXN/mes).</span>
+                        </li>
+                      </ul>
+                    ) : (
+                      <ul className="space-y-1.5 text-blue-800">
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>El cambio se aplica <strong>de inmediato</strong>.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>Se te <strong>acredita</strong> el saldo no utilizado de tu plan actual para los días restantes.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>A partir del <strong>próximo ciclo</strong>, se cobra el precio del Plan Emprendedor ($250 MXN/mes).</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <InformationCircleIcon className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-amber-800">Las funcionalidades exclusivas de Business dejarán de estar disponibles.</span>
+                        </li>
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleConfirmChangePlan}
+                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <ArrowsRightLeftIcon className="h-5 w-5" />
+                  Confirmar cambio a {targetPlanName}
+                </button>
+                <button
+                  onClick={() => setChangePlanModal({ open: false, targetPlanId: null, isUpgrade: false })}
+                  className="w-full py-2 px-4 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

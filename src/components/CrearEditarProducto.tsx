@@ -19,8 +19,10 @@ import { COLORES_COMUNES, type ColorOption } from '../colores';
 import { db } from "../credenciales";
 // 2. IMPORTAMOS doc, getDoc, setDoc, addDoc y Timestamp
 import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts';
+import { useAuth, useSubscription } from '../contexts';
 import { userQuery, withUserId } from '../utils/multitenancy';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
+import showToast from '../utils/toast';
 
 // --- CONFIGURACIÓN Y DATOS ---
 const OFFER_PERCENTAGES = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
@@ -473,6 +475,8 @@ const VariantCard: React.FC<VariantCardProps> = ({
 const CrearEditarProducto: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { planLimits, isBusiness } = useSubscription();
+    const { upgradeProps } = useUpgradeModal();
     const uid = user?.uid;
     // 3. CAPTURAMOS EL ID
     const { id } = useParams();
@@ -498,6 +502,24 @@ const CrearEditarProducto: React.FC = () => {
     }));
 
     // --- 4. CARGAR DATOS SI ES EDICIÓN ---
+    // Also block creation if product limit reached (prevents URL bypass)
+    useEffect(() => {
+        if (isEditMode) return; // Only check on creation
+        if (!uid) return;
+        const checkLimit = async () => {
+            try {
+                const snap = await getDocs(userQuery('productos', uid));
+                if (snap.size >= planLimits.maxProducts) {
+                    showToast(`Has alcanzado el límite de ${planLimits.maxProducts} productos de tu plan.`, 'error');
+                    navigate('/productos');
+                }
+            } catch (e) {
+                console.error('Error checking product count:', e);
+            }
+        };
+        checkLimit();
+    }, [uid, isEditMode, planLimits.maxProducts, navigate]);
+
     useEffect(() => {
         if (!isEditMode || !id) return;
 
@@ -793,9 +815,24 @@ const CrearEditarProducto: React.FC = () => {
         if (isFilesArray) {
             const originalFiles = filesOrUrls as File[];
             
+            // Enforce image limit per variant based on plan
+            const currentVariant = product.variants.find(v => v.id === variantId);
+            const existingCount = (currentVariant?.imageUrls?.length || 0) + (localImagePreviews[variantId]?.length || 0);
+            const remainingSlots = planLimits.maxImagesPerVariant - existingCount;
+            
+            if (remainingSlots <= 0) {
+                showToast(`Límite de ${planLimits.maxImagesPerVariant} imágenes por variante alcanzado. ${!isBusiness ? 'Mejora al Plan Business para subir hasta 8.' : 'Elimina imágenes existentes.'}`, 'info');
+                return;
+            }
+            
+            const filesToProcess = originalFiles.slice(0, remainingSlots);
+            if (filesToProcess.length < originalFiles.length) {
+                showToast(`Solo se añadirán ${filesToProcess.length} de ${originalFiles.length} imágenes (límite: ${planLimits.maxImagesPerVariant} por variante).`, 'info');
+            }
+            
             // Convertir cada archivo a WebP si es necesario
             const convertedFiles: File[] = [];
-            for (const file of originalFiles) {
+            for (const file of filesToProcess) {
                 try {
                     const webpFile = await convertToWebPIfNeeded(file);
                     convertedFiles.push(webpFile);
@@ -841,7 +878,7 @@ const CrearEditarProducto: React.FC = () => {
 
         setIsImageModalOpen(false);
         setCurrentVariantIdForImage(null);
-    }, [convertToWebPIfNeeded]);
+    }, [convertToWebPIfNeeded, product.variants, localImagePreviews, planLimits, isBusiness]);
 
     const finalPrice = useMemo(() =>
         calculateFinalPrice(product.publicPrice, product.offerPercentage),
@@ -914,98 +951,9 @@ const CrearEditarProducto: React.FC = () => {
         return allVariantsReady;
     }, [product, pendingFiles]);
 
-    const handleGenerateDescription = async () => {
-        if (!product.name || !product.category) {
-            alert("Por favor, rellena el Nombre y la Categoría para generar la descripción.");
-            return;
-        }
+    // IA description generation removed; feature no longer available
 
-        if (!product.productSku) {
-            alert("SKU del producto no disponible.");
-            return;
-        }
 
-        // Determinar el ID de documento a usar en el endpoint
-        const skuForEndpoint = isEditMode && id ? id : product.productSku;
-
-        // Construir payload mínimo para IA (en caso de necesitar crear doc)
-        const buildMinimalProductForAI = (): Partial<ProductData> => ({
-            name: product.name,
-            productSku: product.productSku,
-            creationDate: product.creationDate,
-            cost: product.cost,
-            publicPrice: product.publicPrice,
-            offerPercentage: product.offerPercentage,
-            supplier: product.supplier,
-            category: product.category,
-            shortDetails: product.shortDetails,
-            longDescription: product.longDescription || '',
-            dateAdded: product.dateAdded,
-            publishOnline: product.publishOnline,
-            variants: product.variants.map(v => ({
-                id: v.id,
-                variantSku: v.variantSku,
-                colorName: v.colorName,
-                hexColor: v.hexColor,
-                sizes: v.sizes.map(s => ({ size: s.size, stock: s.stock, isInStock: s.isInStock })),
-                imageIds: v.imageIds,
-                imageUrls: v.imageUrls,
-                publishOnline: v.publishOnline
-            }))
-        });
-
-        // Llamada al endpoint documentado: POST /api/generate-description
-        // En dev usamos ruta relativa para pasar por el proxy de Vite y evitar CORS
-        setIsUploading(true);
-        try {
-            // Asegurarnos que existe el documento en Firestore antes de llamar al backend
-            const preDocRef = doc(db, "productos", skuForEndpoint);
-            const preDocSnap = await getDoc(preDocRef);
-            if (!preDocSnap.exists()) {
-                // Crear/sembrar el documento con datos actuales del estado
-                await setDoc(preDocRef, withUserId(buildMinimalProductForAI(), uid!), { merge: true });
-            }
-
-            const endpoint = import.meta.env.DEV
-                ? '/api/generate-description'
-                : `${BACKEND_URL}/api/generate-description`;
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    productSku: skuForEndpoint,
-                    autoSave: false
-                })
-            });
-
-            // Intentamos parsear JSON, si falla, obtenemos texto para mejor diagnóstico
-            let data: any = null
-            try {
-                data = await response.json()
-            } catch {
-                const text = await response.text()
-                throw new Error(`HTTP ${response.status} ${response.statusText} - ${text || 'Sin contenido'}`)
-            }
-
-            if (!response.ok) {
-                throw new Error(data?.error || `HTTP ${response.status} ${response.statusText}`)
-            }
-
-            if (data?.success && data?.data?.description) {
-                setProduct(prev => ({ ...prev, longDescription: data.data.description }));
-            } else {
-                throw new Error('Respuesta inválida del servidor');
-            }
-        } catch (error: any) {
-            console.error('Error al generar descripción:', error);
-            alert(`Error: ${error.message || 'No se pudo generar la descripción'}`);
-        } finally {
-            setIsUploading(false);
-        }
-    };
 
     // 📦 FUNCIONES DE SUBIDA POR LOTES (Sin cambios mayores, solo uso de la API)
     const uploadImageBatch = useCallback(async (
@@ -1462,16 +1410,6 @@ const CrearEditarProducto: React.FC = () => {
                                 className="w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2.5 text-base"
                             />
                         </div>
-                        <div className="border-t pt-4">
-                            <button
-                                onClick={handleGenerateDescription}
-                                type="button"
-                                className="flex items-center justify-center px-4 py-2 border border-purple-300 shadow-sm text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 transition"
-                            >
-                                <SparklesIcon className="h-5 w-5 mr-2" />
-                                Generar Descripción con IA
-                            </button>
-                        </div>
                     </div>
                     <div className="bg-white shadow-sm rounded-lg p-6 space-y-4">
                         <h2 className="text-xl font-semibold text-gray-800 flex items-center justify-between">
@@ -1584,6 +1522,7 @@ const CrearEditarProducto: React.FC = () => {
                     </div>
                 </div>
             </div>
+            <UpgradeModal {...upgradeProps} />
         </div>
     );
 };

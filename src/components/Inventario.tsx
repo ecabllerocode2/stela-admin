@@ -20,8 +20,9 @@ import {
 import showToast from '../utils/toast';
 import ImageZoomModal from './ImageZoomModal';
 import Select from 'react-select';
-import { useAuth } from '../contexts';
+import { useAuth, useSubscription } from '../contexts';
 import { userQuery, withUserId } from '../utils/multitenancy';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 
 // --- Interfaces ---
 interface Size {
@@ -89,6 +90,8 @@ type OptionType = { value: string; label: string };
 
 const Inventario: React.FC = () => {
   const { user } = useAuth();
+  const { planLimits, isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -475,6 +478,10 @@ const Inventario: React.FC = () => {
                         <button
                           title="Merma"
                           onClick={() => {
+                            if (!isBusiness) {
+                              requireBusiness('Registro de Merma', 'El registro de mermas está disponible en el Plan Business. Mejora tu plan para controlar pérdidas y daños.');
+                              return;
+                            }
                             setSelectedItem(item);
                             setMermaQty(1);
                             setMermaReason('Daño');
@@ -488,6 +495,10 @@ const Inventario: React.FC = () => {
                         <button
                           title="Regalar"
                           onClick={() => {
+                            if (!isBusiness) {
+                              requireBusiness('Registro de Regalos', 'El registro de regalos está disponible en el Plan Business. Mejora tu plan para gestionar obsequios a clientes.');
+                              return;
+                            }
                             setSelectedItem(item);
                             setRegaloQty(1);
                             setRegaloCliente('');
@@ -533,6 +544,9 @@ const Inventario: React.FC = () => {
        {zoomedImage && (
          <ImageZoomModal imageUrl={zoomedImage} onClose={() => setZoomedImage(null)} />
        )}
+
+      {/* Modal de upgrade */}
+      <UpgradeModal {...upgradeProps} />
 
       {/* Modal Merma */}
       {mermaOpen && selectedItem && (

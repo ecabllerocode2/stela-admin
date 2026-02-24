@@ -22,11 +22,17 @@ const SubscriptionSuccess: React.FC = () => {
 
     const syncSubscription = async () => {
       try {
+        const token = await user.getIdToken();
         const params = new URLSearchParams({ userId: user.uid });
         if (sessionId) params.append('sessionId', sessionId);
 
         const res = await fetch(
-          `${BACKEND_URL}/api/subscription-status?${params.toString()}`
+          `${BACKEND_URL}/api/subscription-status?${params.toString()}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
         );
         const data = await res.json();
         console.log('Sincronizacion post-checkout:', data.subscription?.status);

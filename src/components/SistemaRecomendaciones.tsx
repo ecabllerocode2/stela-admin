@@ -187,7 +187,7 @@ const SistemaRecomendaciones: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Sistema de Recomendaciones</h1>
         </div>
         <p className="text-gray-600">
-          Algoritmo inteligente para maximizar ventas. Busca oportunidades de compra perfectas.
+          Algoritmo inteligente para maximizar ventas.
         </p>
       </div>
 

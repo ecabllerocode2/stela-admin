@@ -7,17 +7,30 @@ const TrialBanner: React.FC = () => {
   const { isTrialing, trialDaysLeft, subscription, isActive } = useSubscription();
   const navigate = useNavigate();
 
-  // No mostrar si no hay suscripción o si ya está activa (pagada)
-  if (!subscription || (isActive && !isTrialing)) return null;
+  // No mostrar si no hay suscripción
+  if (!subscription) return null;
 
-  // Banner de cancelación pendiente
+  // Mostrar banner de cancelación pendiente incluso para suscripciones activas pagadas
   if (isActive && subscription.cancelAtPeriodEnd) {
+    // Calcular la fecha de fin del período
+    const periodEnd = subscription.currentPeriodEnd;
+    let endDateStr = '';
+    if (periodEnd) {
+      const endDate = periodEnd?.toDate ? periodEnd.toDate() : new Date(periodEnd);
+      endDateStr = endDate.toLocaleDateString('es-MX', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+
     return (
       <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-sm">
         <div className="flex items-center gap-2 text-amber-800">
           <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
           <span>
-            Tu suscripción se cancelará al final del período actual.
+            Tu suscripción se cancelará{endDateStr ? ` el ${endDateStr}` : ' al final del período actual'}.
+            {endDateStr && ' Hasta esa fecha conservas acceso completo a tu plan.'}
           </span>
         </div>
         <button

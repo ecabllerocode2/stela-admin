@@ -13,6 +13,8 @@ import { db } from '../credenciales';
 import showToast from '../utils/toast';
 import { useAuth } from '../contexts';
 import { userQuery, withUserId } from '../utils/multitenancy';
+import { useSubscription } from '../contexts';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 import { 
   BanknotesIcon, 
   ClockIcon, 
@@ -50,6 +52,8 @@ interface OrdenCobranza {
 const Pagos: React.FC = () => {
   const { user } = useAuth();
   const uid = user?.uid;
+  const { isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const [loading, setLoading] = useState(true);
   const [ordenes, setOrdenes] = useState<OrdenCobranza[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,8 +71,6 @@ const Pagos: React.FC = () => {
   const [fechaPago, setFechaPago] = useState<string>(new Date().toISOString().split('T')[0]);
   const [metodoPago, setMetodoPago] = useState('Transferencia');
   const [submittingPago, setSubmittingPago] = useState(false);
-  const [saldoFavorDisponible, setSaldoFavorDisponible] = useState(0);
-  const [saldoFavorAplicado, setSaldoFavorAplicado] = useState(0);
 
   // Orden seleccionada dentro del modal de pago
   const ordenSeleccionadaPago = useMemo(() => {
@@ -76,13 +78,6 @@ const Pagos: React.FC = () => {
     const lista = (ordenesClientePendientes && ordenesClientePendientes.length) ? ordenesClientePendientes : [ordenParaPago];
     return lista.find(o => o.id === (ordenSeleccionadaId || ordenParaPago.id)) || ordenParaPago;
   }, [ordenParaPago, ordenesClientePendientes, ordenSeleccionadaId]);
-
-  // Ajustar saldo aplicado si cambia saldo disponible o saldo pendiente
-  useEffect(() => {
-    if (!ordenSeleccionadaPago) return;
-    const maxAplicable = Math.min(saldoFavorDisponible, ordenSeleccionadaPago.saldoPendiente || 0);
-    setSaldoFavorAplicado((prev) => Math.min(Math.max(0, prev), maxAplicable));
-  }, [saldoFavorDisponible, ordenSeleccionadaPago]);
 
   // --- 1. Carga de Datos (Cuentas por Cobrar) ---
   const fetchDeudas = async () => {
@@ -141,8 +136,6 @@ const Pagos: React.FC = () => {
     setOrdenParaPago(orden);
     setMontoPagar(orden.saldoPendiente.toString()); // Sugerir liquidar todo
     setFechaPago(new Date().toISOString().split('T')[0]);
-    setSaldoFavorDisponible(0);
-    setSaldoFavorAplicado(0);
 
     // Cargar otras órdenes pendientes del mismo cliente para elegir a cuál aplicar el pago
     const nombreCliente = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
@@ -174,19 +167,6 @@ const Pagos: React.FC = () => {
       setOrdenesClientePendientes(listaFinal);
       setOrdenSeleccionadaId(orden.id);
 
-      // Cargar saldo a favor del cliente (clientes_credito)
-      try {
-        const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
-        const clienteNormalized = nombreCliente.toLowerCase().trim();
-        const docCredito = creditosSnap.docs.find(d => (d.data().cliente || '').toLowerCase().trim() === clienteNormalized);
-        if (docCredito) {
-          const saldo = docCredito.data().saldoTotal || 0;
-          setSaldoFavorDisponible(Math.max(0, saldo));
-          setSaldoFavorAplicado(Math.min(saldo, orden.saldoPendiente));
-        }
-      } catch (err3) {
-        console.warn('No se pudo cargar saldo a favor', err3);
-      }
     })();
   };
 
@@ -201,11 +181,10 @@ const Pagos: React.FC = () => {
     }
 
     const montoNum = parseFloat(montoPagar || '0') || 0;
-    const saldoAplicar = Math.max(0, Math.min(saldoFavorAplicado, saldoFavorDisponible, ordenDestino.saldoPendiente));
-    const totalAbono = montoNum + saldoAplicar;
+    const totalAbono = montoNum;
 
     if (totalAbono <= 0) {
-      return showToast('Ingresa un monto o aplica saldo a favor', 'error');
+      return showToast('Ingresa un monto válido', 'error');
     }
     if (totalAbono > ordenDestino.saldoPendiente) {
       return showToast('El abono supera el saldo pendiente', 'error');
@@ -223,14 +202,6 @@ const Pagos: React.FC = () => {
           monto: montoNum,
           fecha: fechaPago,
           metodo: metodoPago,
-          registradoPor: 'Admin'
-        });
-      }
-      if (saldoAplicar > 0) {
-        pagosARegistrar.push({
-          monto: saldoAplicar,
-          fecha: fechaPago,
-          metodo: 'Saldo a favor',
           registradoPor: 'Admin'
         });
       }
@@ -267,39 +238,10 @@ const Pagos: React.FC = () => {
         }, uid!));
       }
 
-      // Descontar saldo a favor si se aplicó
-      if (saldoAplicar > 0) {
-        const creditosSnap = await getDocs(userQuery('clientes_credito', uid!));
-        const clienteNormalized = (clienteNombre || '').toLowerCase().trim();
-        const docCredito = creditosSnap.docs.find(d => (d.data().cliente || '').toLowerCase().trim() === clienteNormalized);
-        if (docCredito) {
-          const creditRef = docCredito.ref;
-          const data = docCredito.data();
-          const balanceAnterior = data.saldoTotal || 0;
-          const balanceNuevo = Math.max(0, balanceAnterior - saldoAplicar);
-          await updateDoc(creditRef, {
-            saldoTotal: balanceNuevo,
-            movimientos: arrayUnion({
-              tipo: 'débito',
-              motivo: 'aplicado_a_pago',
-              monto: saldoAplicar,
-              referencia: ordenDestino.id,
-              fechaRegistro: fechaPago,
-              balance_anterior: balanceAnterior,
-              balance_nuevo: balanceNuevo,
-              timestamp: Timestamp.now()
-            }),
-            fechaUltimaActualizacion: Timestamp.now()
-          });
-        }
-      }
-
       showToast(`Pago de $${totalAbono} registrado en la orden seleccionada`, 'success');
-      // Preparar datos para abrir ReciboPago (con saldo restante post-pago)
+      // Preparar datos para abrir ReciboPago
       const saldoRestante = Math.max((ordenDestino.saldoPendiente || 0) - totalAbono, 0);
-      const metodoRecibo = (montoNum > 0 && saldoAplicar > 0)
-        ? `${metodoPago} + Saldo a favor`
-        : (montoNum > 0 ? metodoPago : 'Saldo a favor');
+      const metodoRecibo = metodoPago;
 
       setReciboData({
         pago: { monto: totalAbono, fecha: fechaPago, metodo: metodoRecibo, registradoPor: 'Admin', folioTransaccion },
@@ -310,8 +252,6 @@ const Pagos: React.FC = () => {
       setOrdenParaPago(null);
       setOrdenesClientePendientes([]);
       setOrdenSeleccionadaId(null);
-      setSaldoFavorDisponible(0);
-      setSaldoFavorAplicado(0);
       fetchDeudas(); // Recargar lista
     } catch (error) {
       console.error(error);
@@ -354,13 +294,7 @@ const Pagos: React.FC = () => {
   }, [filteredOrdenes]);
 
   const saldoPendienteSeleccionado = ordenSeleccionadaPago?.saldoPendiente || 0;
-  const saldoAplicablePreview = Math.max(0, Math.min(
-    saldoFavorAplicado,
-    saldoFavorDisponible,
-    saldoPendienteSeleccionado
-  ));
-  const montoIngresadoPreview = parseFloat(montoPagar || '0') || 0;
-  const totalAbonoPreview = montoIngresadoPreview + saldoAplicablePreview;
+  const totalAbonoPreview = parseFloat(montoPagar || '0') || 0;
 
   // --- RENDER ---
   return (
@@ -388,11 +322,20 @@ const Pagos: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => setHistorialOpen(true)}
+              onClick={() => {
+                if (!isBusiness) {
+                  requireBusiness('Historial de Pagos', 'Consulta el historial completo de pagos con el plan Business.');
+                  return;
+                }
+                setHistorialOpen(true);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-sm font-medium transition-colors flex items-center gap-2"
             >
               <DocumentArrowDownIcon className="h-5 w-5" />
               Historial
+              {!isBusiness && (
+                <span className="text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full">PRO</span>
+              )}
             </button>
           </div>
         </div>
@@ -457,7 +400,13 @@ const Pagos: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => setOrdenParaResumen(orden.id)}
+                          onClick={() => {
+                            if (!isBusiness) {
+                              requireBusiness('Resumen de Orden', 'Visualiza el resumen detallado de cada orden con el plan Business.');
+                              return;
+                            }
+                            setOrdenParaResumen(orden.id);
+                          }}
                           className="py-2 px-3 text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs font-medium transition-colors border border-gray-200"
                         >
                           <EyeIcon className="h-4 w-4" />
@@ -517,47 +466,11 @@ const Pagos: React.FC = () => {
                 </div>
               </div>
 
-              <div className="border border-blue-100 bg-blue-50 rounded-lg p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-blue-700 font-medium">Saldo a favor disponible</p>
-                    <p className="text-lg font-bold text-blue-900">${saldoFavorDisponible.toFixed(2)}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="text-xs px-3 py-1 rounded-full bg-white text-blue-700 border border-blue-200 hover:border-blue-300"
-                    onClick={() => setSaldoFavorAplicado(Math.min(saldoFavorDisponible, saldoPendienteSeleccionado))}
-                  >
-                    Usar todo
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-blue-800 mb-1">Aplicar saldo a favor</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      max={Math.min(saldoFavorDisponible, saldoPendienteSeleccionado)}
-                      className="w-full pl-7 pr-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 font-semibold text-blue-900 bg-white"
-                      value={saldoFavorAplicado}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value || '0') || 0;
-                        const max = Math.min(saldoFavorDisponible, saldoPendienteSeleccionado);
-                        setSaldoFavorAplicado(Math.max(0, Math.min(val, max)));
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-blue-700 mt-1">Máximo aplicable: ${Math.min(saldoFavorDisponible, saldoPendienteSeleccionado).toFixed(2)}</p>
-                </div>
-              </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium">Total a abonar (pago + saldo)</p>
-                  <p className="text-sm text-gray-600">Saldo pendiente de esta orden: ${saldoPendienteSeleccionado.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 font-medium">Total a abonar</p>
+                  <p className="text-sm text-gray-600">Saldo pendiente: ${saldoPendienteSeleccionado.toFixed(2)}</p>
                 </div>
                 <p className="text-xl font-bold text-gray-900">${totalAbonoPreview.toFixed(2)}</p>
               </div>
@@ -646,6 +559,8 @@ const Pagos: React.FC = () => {
         isOpen={historialOpen}
         onClose={() => setHistorialOpen(false)}
       />
+
+      <UpgradeModal {...upgradeProps} />
 
     </div>
   );

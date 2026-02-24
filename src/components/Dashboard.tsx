@@ -7,8 +7,9 @@ import {
 import { Link } from 'react-router-dom';
 import { getDocs } from 'firebase/firestore';
 import { SparklesIcon } from '@heroicons/react/24/outline';
-import { useAuth } from '../contexts';
+import { useAuth, useSubscription } from '../contexts';
 import { userQuery } from '../utils/multitenancy';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 
 // --- Interfaces ---
 interface Producto {
@@ -82,17 +83,21 @@ interface KPICardProps {
     color: keyof typeof kpiColorClasses;
     path?: string;
     description?: string;
+    locked?: boolean;
+    onLockedClick?: () => void;
 }
 
-const KPICard: React.FC<KPICardProps> = ({ title, value, unit, icon: Icon, color, path, description }) => {
-    const CardContainer = path ? Link : 'div';
+const KPICard: React.FC<KPICardProps> = ({ title, value, unit, icon: Icon, color, path, description, locked, onLockedClick }) => {
+    const CardContainer = locked ? 'div' : path ? Link : 'div';
 
     return (
         <CardContainer 
-            to={path || '#'}
+            to={(!locked && path) ? path : '#'}
+            onClick={locked ? onLockedClick : undefined}
             className={`
-                bg-white shadow-sm rounded-lg p-5 transition duration-200 border border-gray-100
-                ${path ? 'hover:shadow-md hover:border-blue-300 cursor-pointer hover:-translate-y-0.5' : ''}
+                bg-white shadow-sm rounded-lg p-5 transition duration-200 border border-gray-100 relative
+                ${locked ? 'cursor-pointer hover:shadow-md hover:border-purple-300 opacity-75' : ''}
+                ${!locked && path ? 'hover:shadow-md hover:border-blue-300 cursor-pointer hover:-translate-y-0.5' : ''}
             `}
         >
             <div className="flex items-center justify-between">
@@ -110,6 +115,11 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, unit, icon: Icon, color
                     <Icon className="h-full w-full" />
                 </div>
             </div>
+            {locked && (
+                <div className="absolute top-2 right-2 bg-purple-100 text-purple-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                    <SparklesIcon className="h-3 w-3" /> Business
+                </div>
+            )}
         </CardContainer>
     );
 };
@@ -133,6 +143,8 @@ const actionColorMap = {
 // --- Componente Principal Dashboard ---
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const { isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -269,7 +281,8 @@ const Dashboard: React.FC = () => {
         icon: CurrencyDollarIcon, 
         color: 'amber' as keyof typeof kpiColorClasses,
         path: '/compras',
-        description: 'A proveedores'
+        description: 'A proveedores',
+        businessOnly: true
       },
       { 
         title: 'Cuentas por Cobrar', 
@@ -278,7 +291,8 @@ const Dashboard: React.FC = () => {
         icon: BanknotesIcon, 
         color: 'blue' as keyof typeof kpiColorClasses,
         path: '/pagos',
-        description: `${ventasPendientes} órdenes con saldo`
+        description: `${ventasPendientes} órdenes con saldo`,
+        businessOnly: true
       },
       { 
         title: 'Inventario Total', 
@@ -296,7 +310,8 @@ const Dashboard: React.FC = () => {
         icon: WalletIcon, 
         color: 'teal' as keyof typeof kpiColorClasses,
         path: '/inventario',
-        description: 'Precio público'
+        description: 'Precio público',
+        businessOnly: true
       },
       { 
         title: 'Pedidos Pendientes', 
@@ -323,7 +338,8 @@ const Dashboard: React.FC = () => {
         icon: TagIcon, 
         color: 'gray' as keyof typeof kpiColorClasses,
         path: '/saldo-a-favor',
-        description: `${clientesCredito.length} clientes`
+        description: `${clientesCredito.length} clientes`,
+        businessOnly: true
       },
     ];
   }, [loading, productos, ordenes, clientesCredito, inventoryMovements]);
@@ -600,11 +616,23 @@ const Dashboard: React.FC = () => {
       <section>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Métricas Clave</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {kpis.map((kpi, index) => (
-            <KPICard key={index} {...kpi} />
-          ))}
+          {kpis.map((kpi, index) => {
+            const isLocked = !isBusiness && kpi.businessOnly;
+            return (
+              <KPICard
+                key={index}
+                {...kpi}
+                value={isLocked ? '—' : kpi.value}
+                locked={isLocked}
+                onLockedClick={() => requireBusiness(kpi.title, `Accede a la métrica "${kpi.title}" mejorando al Plan Business.`)}
+              />
+            );
+          })}
         </div>
       </section>
+
+      {/* Modal de upgrade */}
+      <UpgradeModal {...upgradeProps} />
     </div>
   );
 };

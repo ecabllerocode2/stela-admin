@@ -21,6 +21,8 @@ import {
 import { getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { userQuery } from '../utils/multitenancy';
+import { useSubscription } from '../contexts';
+import UpgradeModal, { useUpgradeModal } from './UpgradeModal';
 
 const currency = (value: number) =>
   value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
@@ -129,6 +131,8 @@ const weekKey = (date: Date) => {
 const Reportes: React.FC = () => {
   const { user } = useAuth();
   const uid = user?.uid;
+  const { isBusiness } = useSubscription();
+  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const [selectedRange, setSelectedRange] = useState<string>('30d');
   const [baseContable, setBaseContable] = useState<'caja' | 'devengado'>('caja');
   const [vistaActiva, setVistaActiva] = useState<string>('general');
@@ -640,17 +644,29 @@ const Reportes: React.FC = () => {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {viewTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setVistaActiva(tab.key)}
-            className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
-              tab.key === vistaActiva ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {viewTabs.map((tab) => {
+          const isBusinessTab = tab.key !== 'general';
+          return (
+            <button
+              key={tab.key}
+              onClick={() => {
+                if (isBusinessTab && !isBusiness) {
+                  requireBusiness(`Reporte de ${tab.label}`, `Accede a reportes avanzados de ${tab.label.toLowerCase()} con el plan Business.`);
+                  return;
+                }
+                setVistaActiva(tab.key);
+              }}
+              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                tab.key === vistaActiva ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+              {isBusinessTab && !isBusiness && (
+                <span className="ml-1.5 text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">PRO</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {showFinanzas && (
@@ -1091,6 +1107,8 @@ const Reportes: React.FC = () => {
           ))}
         </div>
       </section>
+
+      <UpgradeModal {...upgradeProps} />
     </div>
   );
 };
