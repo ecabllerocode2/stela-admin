@@ -146,7 +146,8 @@ export function useUserProfile() {
 
   const storeName = profile?.nombreNegocio || profile?.nombre || 'Mi Tienda';
 
-  const shopBaseUrl = import.meta.env.VITE_SHOP_URL || 'https://stela-shop.vercel.app';
+  // si no se provee VITE_SHOP_URL, usar la URL de producción actual de Vercel
+  const shopBaseUrl = import.meta.env.VITE_SHOP_URL || 'https://stela-shop-ecru.vercel.app';
   const storeUrl = profile?.slug ? `${shopBaseUrl}/${profile.slug}` : '';
 
   return {
