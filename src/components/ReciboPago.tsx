@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -32,7 +32,6 @@ interface ReciboPagoProps {
 }
 
 const ReciboPago: React.FC<ReciboPagoProps> = ({ isOpen, onClose, pago, ordenesDestino }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const { storeName } = useUserProfile();
 

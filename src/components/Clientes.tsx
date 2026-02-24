@@ -177,8 +177,6 @@ const Clientes: React.FC = () => {
   }, [clientes, searchTerm, estadoFiltro, ultimaCompraFiltro, cumpleMesFiltro]);
 
   const { user } = useAuth();
-  const { isBusiness } = useSubscription();
-  const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
 
   // Carga inicial de clientes desde Firestore

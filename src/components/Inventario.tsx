@@ -90,7 +90,7 @@ type OptionType = { value: string; label: string };
 
 const Inventario: React.FC = () => {
   const { user } = useAuth();
-  const { planLimits, isBusiness } = useSubscription();
+  const { isBusiness } = useSubscription();
   const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);

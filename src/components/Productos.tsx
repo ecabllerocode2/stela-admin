@@ -125,7 +125,7 @@ const getFlatCategoryOptions = (): OptionType[] => {
 
 const Productos = () => {
   const { user } = useAuth();
-  const { planLimits, isBusiness } = useSubscription();
+  const { planLimits } = useSubscription();
   const { upgradeProps, requireBusiness } = useUpgradeModal();
   const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);

@@ -105,9 +105,6 @@ const ResumenOrden: React.FC<ResumenOrdenProps> = ({ isOpen, orden, onClose, esE
 
       const clienteNombre = typeof orden.cliente === 'string' ? orden.cliente : orden.cliente?.nombre;
 
-      // Usar texto con nombre del negocio en lugar de imagen para el logo en el export
-      const logoSrc = null;
-
       // Agrupar items por nombre de prenda
       const itemsAgrupadosMap = new Map<string, any>();
       (orden.items || []).forEach((item: any) => {
