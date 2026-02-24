@@ -4,9 +4,32 @@
  * Escucha cambios en tiempo real vía onSnapshot.
  */
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../credenciales';
 import { useAuth } from '../contexts/AuthContext';
+
+/** Genera un slug URL-safe único basado en el nombre */
+async function generateUniqueSlug(name: string): Promise<string> {
+  let base = (name || 'tienda')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+  if (!base) base = 'tienda';
+
+  let slug = base;
+  let attempt = 0;
+
+  while (true) {
+    const q = query(collection(db, 'users'), where('slug', '==', slug));
+    const snap = await getDocs(q);
+    if (snap.empty) return slug;
+    attempt++;
+    slug = `${base}-${attempt}`;
+  }
+}
 
 export interface StoreConfig {
   descripcionTienda?: string;
@@ -54,9 +77,22 @@ export function useUserProfile() {
 
     const unsub = onSnapshot(
       doc(db, 'users', user.uid),
-      (snap) => {
+      async (snap) => {
         if (snap.exists()) {
           const data = snap.data();
+
+          // Si el usuario no tiene slug (cuenta antigua o registro incompleto),
+          // generarlo y guardarlo automáticamente.
+          if (!data.slug) {
+            const newSlug = await generateUniqueSlug(data.nombreNegocio || data.nombre || user.email || '');
+            await updateDoc(doc(db, 'users', user.uid), {
+              slug: newSlug,
+              updatedAt: serverTimestamp(),
+            });
+            // onSnapshot disparará de nuevo con el slug ya guardado
+            return;
+          }
+
           setProfile({
             uid: snap.id,
             email: data.email || user.email || '',
