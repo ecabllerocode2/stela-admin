@@ -1,106 +1,159 @@
 rules_version = '2';
 
+// ================================================================
+// REGLAS UNIFICADAS — stela-admin + stela-shop
+// Ambos proyectos comparten el mismo proyecto Firebase (stela-a8c06)
+// y por tanto este único archivo rige todo el acceso a Firestore.
+// ================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ──────────────────────────────────────────────
-    // Helper: el documento pertenece al usuario autenticado
+    // Funciones helper
     // ──────────────────────────────────────────────
-    function isOwner() {
-      return request.auth != null && resource.data.userId == request.auth.uid;
+
+    // El usuario autenticado es el Backend (service account con custom claim)
+    function isBackend() {
+      return request.auth != null && request.auth.token.admin == true;
     }
 
+    // El usuario está autenticado
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Verifica que el campo userId del documento nuevo sea el del usuario autenticado
+    // El documento existente pertenece al usuario autenticado (campo userId)
+    function isOwner() {
+      return request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // El documento nuevo que se está creando pertenece al usuario autenticado
     function creatingOwn() {
       return isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
     // ──────────────────────────────────────────────
-    // Colecciones principales — CRUD solo para el propietario
+    // ADMIN — Colecciones de negocio (solo el propietario)
+    // Cada documento tiene campo userId = uid del dueño.
     // ──────────────────────────────────────────────
 
     match /productos/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
-    }
-
-    match /productos_public/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
+      match /{sub=**} {
+        allow read, write: if isOwner() || isBackend();
+      }
     }
 
     match /ordenes/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /clientes/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /clientes_credito/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /proveedores/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /finanzas/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /inventory_movements/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /devoluciones/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /mermas/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /regalos/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     match /tokens/{docId} {
-      allow read, update, delete: if isOwner();
-      allow create: if creatingOwn();
+      allow read, update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
     }
 
     // ──────────────────────────────────────────────
-    // Perfil de usuario — cada usuario solo su propio doc
+    // COMPARTIDA — productos_public
+    // El admin escribe (sus propios docs con userId),
+    // la tienda lee libremente (filtrado por userId en la query).
+    // ──────────────────────────────────────────────
+    match /productos_public/{docId} {
+      allow read: if true;
+      allow update, delete: if isOwner() || isBackend();
+      allow create: if creatingOwn() || isBackend();
+    }
+
+    // ──────────────────────────────────────────────
+    // COMPARTIDA — users (perfiles de vendedores)
+    // Lectura pública: la tienda carga perfiles por slug sin auth
+    // y el registro consulta slugs para garantizar unicidad.
+    // Escritura: solo el propio usuario.
     // ──────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if false;
     }
 
     // ──────────────────────────────────────────────
-    // Suscripciones — cada usuario solo su propio doc
+    // ADMIN — Suscripciones
     // ──────────────────────────────────────────────
     match /subscriptions/{userId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if (isAuthenticated() && request.auth.uid == userId) || isBackend();
       allow delete: if false;
+    }
+
+    // ──────────────────────────────────────────────
+    // SHOP — Colecciones gestionadas solo por el backend
+    // ──────────────────────────────────────────────
+    match /pagos/{docId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if isBackend();
+    }
+
+    match /users_asistant/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isBackend();
+    }
+
+    match /marketing_contacts/{docId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if isBackend();
+    }
+
+    match /credenciales/{docId} {
+      allow read, write: if isBackend();
+    }
+
+    match /entregas/{docId} {
+      allow read, write: if isBackend();
     }
 
     // ──────────────────────────────────────────────
