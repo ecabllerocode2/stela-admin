@@ -112,11 +112,13 @@ service cloud.firestore {
     // Lectura pública: la tienda carga perfiles por slug sin auth
     // y el registro consulta slugs para garantizar unicidad.
     // Escritura: solo el propio usuario.
+    // NOTA: tiendaActiva solo puede ser modificado por el backend (Admin SDK).
     // ──────────────────────────────────────────────
     match /users/{userId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.get('tiendaActiva', null) == resource.data.get('tiendaActiva', null);
       allow delete: if false;
     }
 
