@@ -53,6 +53,10 @@ async function generateUniqueSlug(name: string): Promise<string> {
 async function createUserProfile(uid: string, email: string, profile: UserProfile) {
   const slug = await generateUniqueSlug(profile.nombreNegocio || profile.nombre);
 
+  // Calcular fecha de expiración del trial (15 días)
+  const trialEnd = new Date();
+  trialEnd.setDate(trialEnd.getDate() + 15);
+
   // Guardar perfil en colección 'users'
   await setDoc(doc(db, 'users', uid), {
     uid,
@@ -61,13 +65,10 @@ async function createUserProfile(uid: string, email: string, profile: UserProfil
     nombreNegocio: profile.nombreNegocio || '',
     telefono: profile.telefono,
     slug,
+    trialEndsAt: trialEnd, // Fecha de expiración del trial (para verificar en la tienda)
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-
-  // Crear suscripción trial de 15 días (plan Business)
-  const trialEnd = new Date();
-  trialEnd.setDate(trialEnd.getDate() + 15);
 
   await setDoc(doc(db, 'subscriptions', uid), {
     plan: 'business',

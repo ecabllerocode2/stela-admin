@@ -118,7 +118,8 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isAuthenticated() && request.auth.uid == userId
-        && request.resource.data.get('tiendaActiva', null) == resource.data.get('tiendaActiva', null);
+        && request.resource.data.get('tiendaActiva', null) == resource.data.get('tiendaActiva', null)
+        && request.resource.data.get('trialEndsAt', null) == resource.data.get('trialEndsAt', null);
       allow delete: if false;
     }
 

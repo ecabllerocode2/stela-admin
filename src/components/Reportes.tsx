@@ -4,13 +4,11 @@ import {
   ArrowRightIcon,
   ArrowTrendingDownIcon,
   ArrowTrendingUpIcon,
-  ArrowsRightLeftIcon,
   ChartBarIcon,
   CheckCircleIcon,
   CloudArrowDownIcon,
   CurrencyDollarIcon,
   DocumentArrowDownIcon,
-  ShieldCheckIcon,
   ShoppingBagIcon,
   ShoppingCartIcon,
   SparklesIcon,
@@ -28,18 +26,11 @@ const currency = (value: number) =>
   value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
 const timePresets = [
-  { key: '7d', label: '7 días', days: 7 },
-  { key: '30d', label: '30 días', days: 30 },
-  { key: '90d', label: '90 días', days: 90 },
-  { key: '12m', label: '12 meses', days: 365 },
-  { key: 'custom', label: 'Personalizado', days: 0 }
-];
-
-const viewTabs = [
-  { key: 'general', label: 'General' },
-  { key: 'finanzas', label: 'Finanzas' },
-  { key: 'operaciones', label: 'Operaciones' },
-  { key: 'clientes', label: 'Clientes' }
+  { key: '7d', label: 'Última semana', days: 7 },
+  { key: '30d', label: 'Último mes', days: 30 },
+  { key: '90d', label: '3 meses', days: 90 },
+  { key: '12m', label: 'Último año', days: 365 },
+  { key: 'custom', label: 'Elegir fechas', days: 0 }
 ];
 
 type Orden = {
@@ -135,7 +126,6 @@ const Reportes: React.FC = () => {
   const { upgradeProps, requireBusiness } = useUpgradeModal();
   const [selectedRange, setSelectedRange] = useState<string>('30d');
   const [baseContable, setBaseContable] = useState<'caja' | 'devengado'>('caja');
-  const [vistaActiva, setVistaActiva] = useState<string>('general');
   const [customFrom, setCustomFrom] = useState<string>('');
   const [customTo, setCustomTo] = useState<string>('');
 
@@ -482,10 +472,9 @@ const Reportes: React.FC = () => {
     const tasaRecompra = clientesConCompras === 0 ? 0 : (clientesRecompra / clientesConCompras) * 100;
     const ticketProm = ordenes.length === 0 ? 0 : ordenes.reduce((acc, o) => acc + (Number(o.totalVenta) || 0), 0) / Math.max(ordenes.length, 1);
     return [
-      { titulo: 'Tasa de recompra', valor: `${tasaRecompra.toFixed(1)}%`, delta: `${clientesRecompra} clientes repiten` },
-      { titulo: 'Clientes activos', valor: clientes.length.toString(), delta: `${clientesConCompras} con compras` },
-      { titulo: 'Ticket promedio', valor: currency(ticketProm || 0), delta: 'Basado en órdenes' },
-      { titulo: 'Churn 60 días', valor: 'N/D', delta: 'Requiere ventana de tiempo' },
+      { titulo: 'Clientes que repiten', valor: `${tasaRecompra.toFixed(1)}%`, delta: `${clientesRecompra} compraron más de una vez` },
+      { titulo: 'Total de clientes', valor: clientes.length.toString(), delta: `${clientesConCompras} han comprado` },
+      { titulo: 'Promedio por venta', valor: currency(ticketProm || 0), delta: 'Precio promedio por pedido' },
     ];
   }, [clientes, ordenes]);
 
@@ -504,26 +493,25 @@ const Reportes: React.FC = () => {
   }, [devoluciones, ordenesEnRango, startDate]);
 
   const kpisCriticos = useMemo(() => {
-    const fillRate = (() => {
+    const pedidosCompletados = (() => {
       const entregadas = ordenes.filter(o => o.estadoPedido === 'entregado').length;
       const total = ordenes.length;
-      return total === 0 ? 'N/D' : `${Math.min(100, Math.round((entregadas / total) * 100))}%`;
+      return total === 0 ? 'Sin datos' : `${Math.min(100, Math.round((entregadas / total) * 100))}%`;
     })();
 
-    const backorder = (() => {
+    const pedidosPorEntregar = (() => {
       const pendientes = ordenes.filter(o => o.estadoPedido !== 'entregado').length;
       const total = ordenes.length;
-      return total === 0 ? 'N/D' : `${Math.round((pendientes / total) * 100)}%`;
+      return total === 0 ? 'Sin datos' : `${Math.round((pendientes / total) * 100)}%`;
     })();
 
     return [
-      { nombre: 'Fill rate', valor: fillRate, detalle: 'Órdenes completas' },
-      { nombre: 'Backorder', valor: backorder, detalle: 'Órdenes con faltantes' },
-      { nombre: 'Utilidad bruta', valor: currency(resumenFinanzas.utilidad), detalle: 'Periodo seleccionado' },
-      { nombre: 'Rotación inventario', valor: `${rotacionInventario[0]?.rotacionMes?.toFixed?.(1) || '0'}x`, detalle: 'Mejor categoría' },
-      { nombre: 'CAC', valor: '$N/D', detalle: 'Agregar fuente de marketing' },
+      { nombre: 'Pedidos completados', valor: pedidosCompletados, detalle: 'Del total de pedidos' },
+      { nombre: 'Por entregar', valor: pedidosPorEntregar, detalle: 'Pendientes de entrega' },
+      { nombre: 'Ganancia del periodo', valor: currency(resumenFinanzas.utilidad), detalle: etiquetaSeleccionada },
+      { nombre: 'Velocidad de venta', valor: `${rotacionInventario[0]?.rotacionMes?.toFixed?.(1) || '0'}x`, detalle: 'Mejor categoría' },
     ];
-  }, [ordenes, resumenFinanzas.utilidad, rotacionInventario]);
+  }, [ordenes, resumenFinanzas.utilidad, rotacionInventario, etiquetaSeleccionada]);
 
   const handleExport = (format: 'csv' | 'xml') => {
     const rows = ventasTabla.map(r => ({
@@ -557,12 +545,31 @@ const Reportes: React.FC = () => {
     URL.revokeObjectURL(link.href);
   };
 
-  const showFinanzas = vistaActiva === 'general' || vistaActiva === 'finanzas';
-  const showOperaciones = vistaActiva === 'general' || vistaActiva === 'operaciones';
-  const showClientes = vistaActiva === 'general' || vistaActiva === 'clientes';
+  // ─── Indicador de rentabilidad ───
+  const profitLevel = useMemo(() => {
+    const m = resumenFinanzas.margen;
+    if (m >= 30) return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', bar: 'bg-emerald-500', label: '¡Excelente!', message: 'Tu negocio tiene muy buena rentabilidad.', advice: 'Sigue así, tu margen de ganancia es saludable.' };
+    if (m >= 15) return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-500', label: 'Bien', message: 'Tu negocio es rentable.', advice: 'Podrías mejorar negociando mejores precios con proveedores.' };
+    if (m > 0) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', bar: 'bg-amber-500', label: 'Ajustado', message: 'Ganas poco por cada venta.', advice: 'Revisa tus costos y considera ajustar precios.' };
+    return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', bar: 'bg-red-500', label: 'Atención', message: 'Estás gastando más de lo que ganas.', advice: 'Necesitas revisar urgentemente tus costos y precios.' };
+  }, [resumenFinanzas.margen]);
+
+  // ─── Desglose de pedidos ───
+  const orderStats = useMemo(() => {
+    const total = ordenesEnRango.length;
+    const entregados = ordenesEnRango.filter(o => o.estadoPedido === 'entregado').length;
+    const enviados = ordenesEnRango.filter(o => o.estadoPedido === 'enviado').length;
+    const pendientes = total - entregados - enviados;
+    return {
+      total, entregados, enviados, pendientes,
+      pctEntregados: total === 0 ? 0 : Math.round((entregados / total) * 100),
+      pctEnviados: total === 0 ? 0 : Math.round((enviados / total) * 100),
+      pctPendientes: total === 0 ? 0 : Math.round((pendientes / total) * 100),
+    };
+  }, [ordenesEnRango]);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       {loading && (
         <div className="p-3 text-sm text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg">
           Cargando datos en vivo...
@@ -570,62 +577,57 @@ const Reportes: React.FC = () => {
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Reportes y Analítica</h1>
-          <p className="text-sm text-gray-500">Panel integral para finanzas, operaciones y clientes.</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">¿Cómo va tu negocio?</h1>
+          <p className="text-sm text-gray-500">Mira de un vistazo tus ventas, gastos y ganancias.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => handleExport('csv')}
+            onClick={exportLegacyCsv}
             className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400"
           >
             <DocumentArrowDownIcon className="w-5 h-5 text-blue-600" />
-            CSV
+            Descargar pedidos
           </button>
-          <button
-            onClick={() => handleExport('xml')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400"
-          >
-            <CloudArrowDownIcon className="w-5 h-5 text-amber-600" />
-            XML
-          </button>
+          {isBusiness && (
+            <>
+              <button
+                onClick={() => handleExport('csv')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400"
+              >
+                <DocumentArrowDownIcon className="w-5 h-5 text-emerald-600" />
+                Reporte CSV
+              </button>
+              <button
+                onClick={() => handleExport('xml')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400"
+              >
+                <CloudArrowDownIcon className="w-5 h-5 text-amber-600" />
+                Reporte XML
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-white border border-gray-200 shadow-sm rounded-xl p-4">
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase mb-3">Periodo de tiempo</p>
         <div className="flex flex-wrap gap-2">
           {timePresets.map((preset) => (
             <button
               key={preset.key}
               onClick={() => setSelectedRange(preset.key)}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                preset.key === selectedRange ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-700 hover:border-blue-200'
+                preset.key === selectedRange ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'border-gray-200 text-gray-700 hover:border-blue-200'
               }`}
             >
               {preset.label}
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-semibold text-gray-500 uppercase">Base contable</span>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            <button
-              onClick={() => setBaseContable('caja')}
-              className={`px-3 py-1.5 text-sm ${baseContable === 'caja' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
-            >
-              Percibida
-            </button>
-            <button
-              onClick={() => setBaseContable('devengado')}
-              className={`px-3 py-1.5 text-sm ${baseContable === 'devengado' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
-            >
-              Devengada
-            </button>
-          </div>
-        </div>
       </div>
 
       {selectedRange === 'custom' && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white border border-gray-200 shadow-sm rounded-xl p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white border border-gray-200 shadow-sm rounded-xl p-4">
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Desde</label>
             <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
@@ -634,217 +636,281 @@ const Reportes: React.FC = () => {
             <label className="block text-xs font-semibold text-gray-500 mb-1">Hasta</label>
             <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
           </div>
-          <div className="flex items-end">
-            <button onClick={exportLegacyCsv} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400">
-              <DocumentArrowDownIcon className="w-5 h-5 text-blue-600" />
-              Exportar CSV (formato anterior)
-            </button>
+        </div>
+      )}
+
+      {/* ═══ Tu Resumen ═══ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+              <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">Ventas</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{currency(resumenFinanzas.ingresos)}</p>
+          <p className="text-xs text-gray-400 mt-1">Total de dinero que recibiste</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+              <ShoppingCartIcon className="w-6 h-6 text-amber-600" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">Gastos</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{currency(resumenFinanzas.gastos)}</p>
+          <p className="text-xs text-gray-400 mt-1">Lo que pagaste en costos</p>
+        </div>
+        <div className={`rounded-xl border shadow-sm p-5 ${resumenFinanzas.utilidad >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${resumenFinanzas.utilidad >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
+              {resumenFinanzas.utilidad >= 0
+                ? <ArrowTrendingUpIcon className="w-6 h-6 text-emerald-600" />
+                : <ArrowTrendingDownIcon className="w-6 h-6 text-red-600" />}
+            </div>
+            <p className={`text-sm font-medium ${resumenFinanzas.utilidad >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>Ganancia</p>
+          </div>
+          <p className={`text-2xl font-bold ${resumenFinanzas.utilidad >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{currency(resumenFinanzas.utilidad)}</p>
+          <p className={`text-xs mt-1 ${resumenFinanzas.utilidad >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Lo que te queda después de gastos</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <ShoppingBagIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">Pedidos</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{orderStats.total}</p>
+          <p className="text-xs text-gray-400 mt-1">{orderStats.entregados} entregados</p>
+        </div>
+      </div>
+
+      {/* ═══ ¿Tu negocio es rentable? ═══ */}
+      <div className={`rounded-xl border shadow-sm p-6 ${profitLevel.bg} ${profitLevel.border}`}>
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center flex-shrink-0">
+            <ChartBarIcon className={`w-7 h-7 ${profitLevel.text}`} />
+          </div>
+          <div className="flex-1">
+            <h2 className={`text-lg font-bold ${profitLevel.text} mb-1`}>¿Tu negocio es rentable? {profitLevel.label}</h2>
+            <p className={`text-sm ${profitLevel.text} mb-3`}>{profitLevel.message}</p>
+            <div className="mb-2">
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className={profitLevel.text}>
+                  Por cada <strong>$100</strong> que vendes, ganas <strong>${Math.max(0, resumenFinanzas.margen).toFixed(0)}</strong>
+                </span>
+                <span className={`font-bold ${profitLevel.text}`}>{resumenFinanzas.margen.toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-white/60 rounded-full h-3">
+                <div className={`h-3 rounded-full transition-all ${profitLevel.bar}`} style={{ width: `${Math.min(100, Math.max(0, resumenFinanzas.margen))}%` }} />
+              </div>
+            </div>
+            <p className={`text-xs ${profitLevel.text} opacity-80`}>{profitLevel.advice}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ Estado de tus pedidos ═══ */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Estado de tus pedidos</h2>
+        {orderStats.total === 0 ? (
+          <p className="text-sm text-gray-400">No hay pedidos en este periodo.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700 w-28">Entregados</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div className="bg-emerald-500 h-4 rounded-full transition-all" style={{ width: `${orderStats.pctEntregados}%` }} />
+              </div>
+              <span className="text-sm font-medium text-gray-900 w-24 text-right">{orderStats.entregados} ({orderStats.pctEntregados}%)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700 w-28">Enviados</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div className="bg-blue-500 h-4 rounded-full transition-all" style={{ width: `${orderStats.pctEnviados}%` }} />
+              </div>
+              <span className="text-sm font-medium text-gray-900 w-24 text-right">{orderStats.enviados} ({orderStats.pctEnviados}%)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700 w-28">Pendientes</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div className="bg-amber-500 h-4 rounded-full transition-all" style={{ width: `${orderStats.pctPendientes}%` }} />
+              </div>
+              <span className="text-sm font-medium text-gray-900 w-24 text-right">{orderStats.pendientes} ({orderStats.pctPendientes}%)</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══ Upgrade prompt para emprendedor ═══ */}
+      {!isBusiness && (
+        <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-xl border border-purple-200 shadow-sm p-6">
+          <div className="flex items-start gap-4">
+            <SparklesIcon className="w-8 h-8 text-purple-500 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Conoce más sobre tu negocio</h3>
+              <p className="text-sm text-gray-600 mb-4">Con el plan Business puedes ver:</p>
+              <ul className="text-sm text-gray-700 space-y-1.5 mb-4">
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Comparación de ganancias por periodo</li>
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Tendencia semanal de ganancias</li>
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Control de inventario y proveedores</li>
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Análisis de clientes y recompras</li>
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Indicadores de salud de tu negocio</li>
+                <li className="flex items-center gap-2"><CheckCircleIcon className="w-4 h-4 text-purple-500 flex-shrink-0" />Exportar reportes completos</li>
+              </ul>
+              <button
+                onClick={() => requireBusiness('Reportes avanzados', 'Desbloquea todos los análisis y reportes con el plan Business.')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <SparklesIcon className="w-4 h-4" />
+                Conocer plan Business
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {viewTabs.map((tab) => {
-          const isBusinessTab = tab.key !== 'general';
-          return (
-            <button
-              key={tab.key}
-              onClick={() => {
-                if (isBusinessTab && !isBusiness) {
-                  requireBusiness(`Reporte de ${tab.label}`, `Accede a reportes avanzados de ${tab.label.toLowerCase()} con el plan Business.`);
-                  return;
-                }
-                setVistaActiva(tab.key);
-              }}
-              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
-                tab.key === vistaActiva ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-              {isBusinessTab && !isBusiness && (
-                <span className="ml-1.5 text-[10px] font-bold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">PRO</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* ═══ SECCIONES BUSINESS ═══ */}
 
-      {showFinanzas && (
+      {isBusiness && (
         <section className="space-y-6">
           <div className="flex items-center gap-3">
             <ChartBarIcon className="w-6 h-6 text-blue-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Finanzas</h2>
-              <p className="text-sm text-gray-500">Ingresos, gastos, utilidad y margen según base contable.</p>
+              <h2 className="text-xl font-semibold text-gray-900">Análisis detallado</h2>
+              <p className="text-sm text-gray-500">Compara tus números en distintos periodos.</p>
             </div>
+          </div>
+
+          {/* Toggle base contable */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <span className="text-sm text-gray-600">Calcular con:</span>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => setBaseContable('caja')}
+                className={`px-4 py-2 text-sm ${baseContable === 'caja' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                Dinero recibido
+              </button>
+              <button
+                onClick={() => setBaseContable('devengado')}
+                className={`px-4 py-2 text-sm ${baseContable === 'devengado' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                Pedidos entregados
+              </button>
+            </div>
+            <span className="text-xs text-gray-400">
+              {baseContable === 'caja' ? 'Se cuenta el dinero que recibiste' : 'Se cuenta solo lo de pedidos ya entregados'}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Ingresos</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{currency(resumenFinanzas.ingresos)}</p>
-                  <p className="text-xs text-gray-500">{etiquetaSeleccionada}</p>
-                </div>
-                <CurrencyDollarIcon className="w-10 h-10 text-green-600" />
-              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase">Ventas</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{currency(resumenFinanzas.ingresos)}</p>
+              <p className="text-xs text-gray-500">{etiquetaSeleccionada}</p>
             </div>
-
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Gastos</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{currency(resumenFinanzas.gastos)}</p>
-                  <p className="text-xs text-gray-500">Operativos + insumos</p>
-                </div>
-                <ArrowsRightLeftIcon className="w-10 h-10 text-amber-600" />
-              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase">Gastos</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{currency(resumenFinanzas.gastos)}</p>
+              <p className="text-xs text-gray-500">Costos del periodo</p>
             </div>
-
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Utilidad</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{currency(resumenFinanzas.utilidad)}</p>
-                  <p className="text-xs text-gray-500">Base {baseContable === 'caja' ? 'percibida' : 'devengada'}</p>
-                </div>
-                <SparklesIcon className="w-10 h-10 text-blue-600" />
-              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase">Ganancia</p>
+              <p className={`text-2xl font-bold mt-1 ${resumenFinanzas.utilidad >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{currency(resumenFinanzas.utilidad)}</p>
+              <p className="text-xs text-gray-500">{baseContable === 'caja' ? 'Dinero recibido' : 'Pedidos entregados'}</p>
             </div>
-
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Margen</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{resumenFinanzas.margen.toFixed(1)}%</p>
-                  <p className="text-xs text-gray-500">Periodo: {etiquetaSeleccionada}</p>
-                </div>
-                <ArrowTrendingUpIcon className="w-10 h-10 text-emerald-600" />
-              </div>
+              <p className="text-xs font-semibold text-gray-500 uppercase">Margen</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{resumenFinanzas.margen.toFixed(1)}%</p>
+              <p className="text-xs text-gray-500">{etiquetaSeleccionada}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 lg:col-span-2">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Ventas del periodo</p>
-                  <p className="text-sm text-gray-600">Ingreso, gasto y utilidad por rango</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
-                  Base {baseContable === 'caja' ? 'percibida (caja)' : 'devengada (entregas)'}
-                </div>
-              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Comparación por periodo</p>
               <div className="overflow-hidden rounded-lg border border-gray-100">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
                     <tr>
                       <th className="px-4 py-3">Periodo</th>
-                      <th className="px-4 py-3">Ingresos</th>
+                      <th className="px-4 py-3">Ventas</th>
                       <th className="px-4 py-3">Gastos</th>
-                      <th className="px-4 py-3">Utilidad</th>
+                      <th className="px-4 py-3">Ganancia</th>
                       <th className="px-4 py-3">Margen</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {ventasTabla.map((periodo) => {
-                      const ingresos = periodo.ingresos;
-                      const gastos = periodo.gastos;
-                      const utilidad = periodo.utilidad;
-                      const margen = periodo.margen;
-                      return (
-                        <tr key={periodo.key} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{periodo.etiqueta}</td>
-                          <td className="px-4 py-3 text-gray-800">{currency(ingresos)}</td>
-                          <td className="px-4 py-3 text-gray-800">{currency(gastos)}</td>
-                          <td className="px-4 py-3 text-gray-800">{currency(utilidad)}</td>
-                          <td className="px-4 py-3 text-gray-600">{margen.toFixed(1)}%</td>
-                        </tr>
-                      );
-                    })}
+                    {ventasTabla.map((periodo) => (
+                      <tr key={periodo.key} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">{periodo.etiqueta}</td>
+                        <td className="px-4 py-3 text-gray-800">{currency(periodo.ingresos)}</td>
+                        <td className="px-4 py-3 text-gray-800">{currency(periodo.gastos)}</td>
+                        <td className={`px-4 py-3 font-medium ${periodo.utilidad >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{currency(periodo.utilidad)}</td>
+                        <td className="px-4 py-3 text-gray-600">{periodo.margen.toFixed(1)}%</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Utilidad semanal</p>
-                  <p className="text-sm text-gray-600">Comparativo de las últimas 5 semanas</p>
-                </div>
-              </div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Ganancia por semana</p>
               <div className="h-48 flex items-end gap-2">
                 {utilidadSemanal.map((week) => {
                   const barHeight = (week.utilidad / utilidadMax) * 100;
                   return (
                     <div key={week.label} className="flex-1 flex flex-col items-center gap-2">
-                      <div
-                        className="w-full bg-blue-50 rounded-md border border-blue-100 flex items-end justify-center"
-                        style={{ height: '100%' }}
-                      >
-                        <div
-                          className="w-9/12 bg-blue-600 rounded-md"
-                          style={{ height: `${barHeight}%` }}
-                        />
+                      <div className="w-full bg-blue-50 rounded-md border border-blue-100 flex items-end justify-center" style={{ height: '100%' }}>
+                        <div className={`w-9/12 rounded-md ${week.utilidad >= 0 ? 'bg-blue-600' : 'bg-red-400'}`} style={{ height: `${Math.abs(barHeight)}%` }} />
                       </div>
                       <p className="text-[11px] text-gray-500 text-center leading-tight">{week.label}</p>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-3 text-xs text-gray-600 flex items-center gap-2">
-                <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
-                Máximo reciente: {currency(utilidadMax)}
-              </div>
+              <div className="mt-3 text-xs text-gray-500">Mejor semana: {currency(utilidadMax)}</div>
             </div>
           </div>
         </section>
       )}
 
-      {showOperaciones && (
+      {isBusiness && (
         <section className="space-y-6">
           <div className="flex items-center gap-3">
             <Squares2X2Icon className="w-6 h-6 text-amber-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Operaciones y Supply Chain</h2>
-              <p className="text-sm text-gray-500">Compras pendientes, rotación e incidencias de devolución.</p>
+              <h2 className="text-xl font-semibold text-gray-900">Tu inventario y proveedores</h2>
+              <p className="text-sm text-gray-500">Compras pendientes, velocidad de venta y devoluciones.</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Compras pendientes</p>
-                  <p className="text-sm text-gray-600">Seguimiento por proveedor</p>
-                </div>
-                <ShoppingCartIcon className="w-6 h-6 text-blue-600" />
+                <p className="text-sm font-semibold text-gray-700">Compras por pagar</p>
+                <ShoppingCartIcon className="w-5 h-5 text-blue-600" />
               </div>
               <div className="space-y-3">
-                {comprasPendientes.map((compra) => (
+                {comprasPendientes.length === 0 ? (
+                  <p className="text-sm text-gray-400">No hay compras pendientes</p>
+                ) : comprasPendientes.map((compra) => (
                   <div key={compra.folio} className="p-3 rounded-lg border border-gray-100 bg-gray-50">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-gray-900">{compra.proveedor}</p>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full ${
-                          compra.prioridad === 'Alta'
-                            ? 'bg-red-50 text-red-700'
-                            : compra.prioridad === 'Media'
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-green-50 text-green-700'
+                          compra.prioridad === 'Alta' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
                         }`}
                       >
-                        {compra.prioridad}
+                        {compra.prioridad === 'Alta' ? 'Urgente' : 'Normal'}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-600 mt-1">
-                      <span>Folio {compra.folio}</span>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>{currency(compra.monto)}</span>
                     </div>
-                    <p className="text-xs text-blue-600 mt-1">ETA {compra.eta}</p>
                   </div>
                 ))}
               </div>
@@ -852,27 +918,23 @@ const Reportes: React.FC = () => {
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Rotación de inventario</p>
-                  <p className="text-sm text-gray-600">Días de inventario y rotación mensual</p>
-                </div>
-                <ShoppingBagIcon className="w-6 h-6 text-emerald-600" />
+                <p className="text-sm font-semibold text-gray-700">¿Qué tan rápido vendes?</p>
+                <ShoppingBagIcon className="w-5 h-5 text-emerald-600" />
               </div>
+              <p className="text-xs text-gray-400 mb-3">Días que tarda en venderse tu mercancía</p>
               <div className="space-y-3">
                 {rotacionInventario.map((linea) => (
                   <div key={linea.categoria} className="flex items-start justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{linea.categoria}</p>
-                      <p className="text-xs text-gray-600">{linea.diasInventario} días inventario</p>
+                      <p className="text-sm font-medium text-gray-900">{linea.categoria}</p>
+                      <p className="text-xs text-gray-500">
+                        {linea.diasInventario >= 999 ? 'Sin ventas recientes' : `Se vende en ~${linea.diasInventario} días`}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">{linea.rotacionMes.toFixed(1)}x</p>
-                      <div className="flex items-center justify-end gap-1 text-xs text-gray-600">
-                        {linea.tendencia === 'up' && <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-600" />}
-                        {linea.tendencia === 'down' && <ArrowTrendingDownIcon className="w-4 h-4 text-red-600" />}
-                        {linea.tendencia === 'flat' && <ArrowRightIcon className="w-4 h-4 text-gray-500" />}
-                        <span>{linea.tendencia === 'flat' ? 'estable' : 'tendencia'}</span>
-                      </div>
+                    <div className="flex items-center gap-1">
+                      {linea.tendencia === 'up' && <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-600" />}
+                      {linea.tendencia === 'down' && <ArrowTrendingDownIcon className="w-4 h-4 text-red-600" />}
+                      {linea.tendencia === 'flat' && <ArrowRightIcon className="w-4 h-4 text-gray-400" />}
                     </div>
                   </div>
                 ))}
@@ -881,17 +943,14 @@ const Reportes: React.FC = () => {
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Devoluciones</p>
-                  <p className="text-sm text-gray-600">Tasa y causas principales</p>
-                </div>
-                <ArrowPathIcon className="w-6 h-6 text-amber-600" />
+                <p className="text-sm font-semibold text-gray-700">Devoluciones</p>
+                <ArrowPathIcon className="w-5 h-5 text-amber-600" />
               </div>
-              <div className="mb-4">
+              <div className="text-center py-4">
                 <p className="text-3xl font-bold text-gray-900">{(devolucionesResumen.tasa * 100).toFixed(1)}%</p>
-                <p className="text-sm text-gray-500">Sobre órdenes entregadas</p>
+                <p className="text-sm text-gray-500 mt-1">de tus pedidos fueron devueltos</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 border-t border-gray-100 pt-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-700">Devoluciones</span>
                   <span className="text-gray-900 font-semibold">{devolucionesResumen.totalDevoluciones}</span>
@@ -906,84 +965,58 @@ const Reportes: React.FC = () => {
         </section>
       )}
 
-      {showClientes && (
+      {isBusiness && (
         <section className="space-y-6">
           <div className="flex items-center gap-3">
             <UsersIcon className="w-6 h-6 text-purple-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Clientes y Crecimiento</h2>
-              <p className="text-sm text-gray-500">Tasa de recompra, ticket y churn.</p>
+              <h2 className="text-xl font-semibold text-gray-900">Tus clientes</h2>
+              <p className="text-sm text-gray-500">Conoce quiénes te compran y cómo retenerlos.</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {clientesKpis.map((kpi) => (
-              <div key={kpi.titulo} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase">{kpi.titulo}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{kpi.valor}</p>
-                <p className="text-xs text-green-600 mt-1">{kpi.delta}</p>
+              <div key={kpi.titulo} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <p className="text-sm text-gray-500 mb-1">{kpi.titulo}</p>
+                <p className="text-2xl font-bold text-gray-900">{kpi.valor}</p>
+                <p className="text-xs text-gray-400 mt-1">{kpi.delta}</p>
               </div>
             ))}
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase">Cohortes</p>
-                <p className="text-sm text-gray-600">Recompra, frecuencia y valor de vida</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <p className="text-xs text-gray-500 uppercase font-semibold">Recompra</p>
-                <p className="text-lg font-bold text-gray-900">38%</p>
-                <p className="text-xs text-gray-600">Clientes que realizaron 2+ compras en 60 días</p>
-              </div>
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <p className="text-xs text-gray-500 uppercase font-semibold">Frecuencia</p>
-                <p className="text-lg font-bold text-gray-900">1.8 pedidos / mes</p>
-                <p className="text-xs text-gray-600">Promedio clientes activos</p>
-              </div>
-              <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <p className="text-xs text-gray-500 uppercase font-semibold">LTV estimado</p>
-                <p className="text-lg font-bold text-gray-900">$7,450</p>
-                <p className="text-xs text-gray-600">Ticket x frecuencia x permanencia</p>
-              </div>
-            </div>
           </div>
         </section>
       )}
 
-      {/* Tabla filtrable estilo legado */}
+      {/* Detalle de pedidos */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <Squares2X2Icon className="w-6 h-6 text-gray-700" />
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Tabla de Órdenes </h2>
-            <p className="text-sm text-gray-500">Filtra y exporta con las columnas del CSV</p>
+            <h2 className="text-xl font-semibold text-gray-900">Detalle de pedidos</h2>
+            <p className="text-sm text-gray-500">Busca, filtra y exporta tus pedidos.</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={exportLegacyCsv} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-sm rounded-lg shadow-sm hover:border-blue-400">
               <DocumentArrowDownIcon className="w-5 h-5 text-blue-600" />
-              CSV legado
+              Descargar CSV
             </button>
           </div>
         </div>
 
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm p-4">
-          <p className="text-xs font-semibold text-blue-700 uppercase mb-3">Totales de Datos Filtrados</p>
+          <p className="text-xs font-semibold text-blue-700 uppercase mb-3">Resumen de lo filtrado</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg p-3 border border-blue-100">
-              <p className="text-xs text-gray-500 font-semibold uppercase">Precio Público Total</p>
+              <p className="text-xs text-gray-500 font-semibold uppercase">Total vendido</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{currency(tableTotales.totalPrecio)}</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-blue-100">
-              <p className="text-xs text-gray-500 font-semibold uppercase">Costo Total</p>
+              <p className="text-xs text-gray-500 font-semibold uppercase">Total en costos</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{currency(tableTotales.totalCosto)}</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-green-100">
-              <p className="text-xs text-gray-500 font-semibold uppercase">Utilidad Bruta</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">{currency(tableTotales.utilidadBruta)}</p>
+              <p className="text-xs text-gray-500 font-semibold uppercase">Ganancia</p>
+              <p className={`text-2xl font-bold mt-1 ${tableTotales.utilidadBruta >= 0 ? 'text-green-600' : 'text-red-600'}`}>{currency(tableTotales.utilidadBruta)}</p>
             </div>
           </div>
         </div>
@@ -1087,12 +1120,13 @@ const Reportes: React.FC = () => {
         </div>
       </section>
 
+      {isBusiness && (
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <SparklesIcon className="w-6 h-6 text-blue-600" />
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">KPIs críticos</h2>
-            <p className="text-sm text-gray-500">Monitoreo rápido de desempeño integral.</p>
+            <h2 className="text-xl font-semibold text-gray-900">Salud de tu negocio</h2>
+            <p className="text-sm text-gray-500">Indicadores rápidos del desempeño general.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1107,6 +1141,7 @@ const Reportes: React.FC = () => {
           ))}
         </div>
       </section>
+      )}
 
       <UpgradeModal {...upgradeProps} />
     </div>
