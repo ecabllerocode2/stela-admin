@@ -65,6 +65,7 @@ async function createUserProfile(uid: string, email: string, profile: UserProfil
     nombreNegocio: profile.nombreNegocio || '',
     telefono: profile.telefono,
     slug,
+    tiendaActiva: true, // Activar tienda durante trial (la shop validará trialEndsAt)
     trialEndsAt: trialEnd, // Fecha de expiración del trial (para verificar en la tienda)
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
