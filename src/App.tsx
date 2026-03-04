@@ -206,8 +206,11 @@ function Layout({ children }: { children: React.ReactNode }) {
         ></div>
       )}
 
-      {/* --- Botón flotante de soporte WhatsApp (se oculta en CrearEditarProducto para no tapar) --- */}
-      {!location.pathname.includes('/productos/') && (
+      {/* --- Botón flotante de soporte WhatsApp (se oculta en CrearEditarProducto y NuevoPedido para no tapar) --- */}
+      {!location.pathname.includes('/productos/') && 
+       !location.pathname.includes('/nuevo-pedido') && 
+       !location.pathname.includes('/pedidos/editar/') &&
+       !location.pathname.includes('/ordenes/editar/') && (
         <a
           href="https://wa.me/525577102959?text=Hola%2C%20necesito%20ayuda%20con%20Stela%20%F0%9F%91%8B"
           target="_blank"
