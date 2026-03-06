@@ -477,7 +477,7 @@ const NuevoPedido: React.FC = () => {
       await runTransaction(db, async (transaction) => {
         const fechaHoy = new Date().toISOString().split('T')[0];
 
-        // A. VERIFICAR Y DESCONTAR STOCK (Solo para items de origen 'stock' y si NO estamos editando)
+        // A. VERIFICAR Y DESCONTAR STOCK (Solo para items de origen 'stock')
         const itemsDeStock = cart.filter(i => i.origen === 'stock');
 
         // Agrupar por producto-variant-talla para evitar lecturas repetidas y asegurar decrementos correctos
@@ -489,37 +489,59 @@ const NuevoPedido: React.FC = () => {
           stockGroups.set(key, group);
         }
 
-        // Solo descontar stock si es una NUEVA orden, no si estamos editando una existente
-        if (!editingOrdenId) {
-          for (const groupItems of stockGroups.values()) {
-            const sample = groupItems[0];
-            const prodRef = doc(db, 'productos', sample.productId);
-            const prodDoc = await transaction.get(prodRef);
+        // Siempre descontar stock para ítems con origen 'stock', incluso al editar
+        // (La UI ya maneja que si es 'bajo_pedido' no se descuenta)
+        for (const groupItems of stockGroups.values()) {
+          const sample = groupItems[0];
+          const prodRef = doc(db, 'productos', sample.productId);
+          const prodDoc = await transaction.get(prodRef);
 
-            if (!prodDoc.exists()) throw `El producto ${sample.nombre} ya no existe`;
+          if (!prodDoc.exists()) throw `El producto ${sample.nombre} ya no existe`;
 
-            const prodData = prodDoc.data() as Product;
-            const variantIdx = prodData.variants.findIndex(v => v.id === sample.variantId);
-            if (variantIdx === -1) throw `Datos de ${sample.nombre} cambiaron (color)`;
-            const sizeIdx = prodData.variants[variantIdx].sizes.findIndex(s => s.size === sample.sizeName);
-            if (sizeIdx === -1) throw `Datos de ${sample.nombre} cambiaron (talla)`;
+          const prodData = prodDoc.data() as Product;
+          const variantIdx = prodData.variants.findIndex(v => v.id === sample.variantId);
+          if (variantIdx === -1) throw `Datos de ${sample.nombre} cambiaron (color)`;
+          const sizeIdx = prodData.variants[variantIdx].sizes.findIndex(s => s.size === sample.sizeName);
+          if (sizeIdx === -1) throw `Datos de ${sample.nombre} cambiaron (talla)`;
 
-            const currentStock = prodData.variants[variantIdx].sizes[sizeIdx].stock;
-            const needed = groupItems.length;
+          const currentStock = prodData.variants[variantIdx].sizes[sizeIdx].stock;
+          
+          // Si estamos editando, solo descontamos los NUEVOS ítems agregados al stock
+          // Pero para simplificar y asegurar consistencia, el componente está diseñado
+          // para que 'origen' sea 'stock' solo si hay disponibilidad real en ese momento.
+          // Si es una EDICIÓN, los ítems previos ya deberían haber descontado stock o ser bajo_pedido.
+          
+          let needed = groupItems.length;
+          
+          // Si estamos editando, necesitamos saber cuántos de estos ítems ya estaban en la orden
+          // para no descontar doble.
+          if (editingOrdenId) {
+            const oldOrdenDoc = await transaction.get(doc(db, 'ordenes', editingOrdenId));
+            if (oldOrdenDoc.exists()) {
+              const oldItems = oldOrdenDoc.data().items || [];
+              const alreadyPresent = oldItems.filter((oi: any) => 
+                oi.productoId === sample.productId && 
+                oi.variantId === sample.variantId && 
+                oi.talla === sample.sizeName &&
+                oi.origen === 'stock'
+              ).length;
+              needed = Math.max(0, groupItems.length - alreadyPresent);
+            }
+          }
 
+          if (needed > 0) {
             if (currentStock < needed) {
               throw `Stock insuficiente para ${sample.nombre} (${sample.color} ${sample.talla}). Disponible: ${currentStock}, requerido: ${needed}`;
             }
 
             prodData.variants[variantIdx].sizes[sizeIdx].stock = currentStock - needed;
-            if (prodData.variants[variantIdx].sizes[sizeIdx].stock === 0) {
-              prodData.variants[variantIdx].sizes[sizeIdx].isInStock = false;
-            }
+            prodData.variants[variantIdx].sizes[sizeIdx].isInStock = prodData.variants[variantIdx].sizes[sizeIdx].stock > 0;
 
             transaction.update(prodRef, { variants: prodData.variants });
 
-            // Registrar un movimiento por cada ítem del grupo
-            for (const item of groupItems) {
+            // Registrar un movimiento por cada nuevo ítem que descuenta stock
+            for (let i = 0; i < needed; i++) {
+              const item = groupItems[i];
               const movementData = {
                 tipo: 'salida',
                 motivo: 'venta',

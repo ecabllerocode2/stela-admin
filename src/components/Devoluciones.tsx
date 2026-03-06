@@ -107,7 +107,7 @@ const Devoluciones: React.FC = () => {
         const idx = parseInt(itemIdx);
         const item = ordenSeleccionada.items[idx];
         if (item) {
-          const itemDevuelto: ItemDevuelto = {
+          const itemDevuelto: ItemDevuelto & { origen?: string } = {
             nombre: item.nombre,
             talla: item.talla,
             color: item.color,
@@ -117,7 +117,8 @@ const Devoluciones: React.FC = () => {
             imagen: item.foto,
             productoId: item.productoId || item.productoID || item.producto || '',
             variantId: typeof item.variantId === 'number' ? item.variantId : undefined,
-            sku: item.sku || ''
+            sku: item.sku || '',
+            origen: item.origen // Preservamos el origen para saber si devolver stock
           };
           itemsADevolver.push(itemDevuelto);
           totalDevuelto += itemDevuelto.cantidad * itemDevuelto.precioUnitario;
@@ -211,8 +212,13 @@ const Devoluciones: React.FC = () => {
         
         transaction.set(devolucionRef, withUserId(devolucionData, uid!));
 
-        // 2. Actualizar stock en productos (sumar cantidad devuelta)
+        // 2. Actualizar stock en productos (sumar cantidad devuelta SOLO SI origen es 'stock')
         for (const itemDevuelto of itemsADevolverResolved) {
+          // Si el producto no salió del stock (fue bajo pedido), NO lo regresamos al inventario
+          if ((itemDevuelto as any).origen !== 'stock') {
+            continue;
+          }
+
           const productIdToUse = itemDevuelto.productIdResolved as string;
           const cacheEntry = productCache.get(productIdToUse);
           if (!cacheEntry) {
